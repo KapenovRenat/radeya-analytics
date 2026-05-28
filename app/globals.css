@@ -1,0 +1,296 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ═══════════════════════════════════════════════════════════════
+   Design tokens — Light + Dark · Vercel/Geist-inspired
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ─── Semantic surfaces (LIGHT) ─────────────────────────────── */
+  --bg: #fafafa;
+  --bg-subtle: #f5f5f5;
+  --surface: #ffffff;
+  --surface-hover: #f5f5f5;
+  --surface-elev: #ffffff;
+
+  /* Borders */
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+  --border-focus: rgba(108, 92, 231, 0.55);
+
+  /* Text */
+  --text: #0a0a0a;
+  --text-dim: #555555;
+  --text-subtle: #888888;
+
+  /* Brand + semantic accents */
+  --accent: #6c5ce7;
+  --accent-soft: rgba(108, 92, 231, 0.12);
+
+  --emerald: #059669;
+  --emerald-soft: rgba(5, 150, 105, 0.10);
+  --red: #dc2626;
+  --red-soft: rgba(220, 38, 38, 0.08);
+  --orange: #ea580c;
+  --orange-soft: rgba(234, 88, 12, 0.10);
+  --amber: #d97706;
+  --amber-soft: rgba(217, 119, 6, 0.10);
+  --blue: #2563eb;
+  --blue-soft: rgba(37, 99, 235, 0.10);
+  --violet: #7c3aed;
+  --violet-soft: rgba(124, 58, 237, 0.10);
+  --kaspi: #f14635;
+
+  /* ─── Sidebar tokens ─────────────────────────────────────────── */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #555555;
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+  --sidebar-accent: rgba(0, 0, 0, 0.05);
+  --sidebar-accent-foreground: #0a0a0a;
+
+  /* ─── Geist palette — full HSL scale (LIGHT) ─────────────────── */
+  --ds-gray-100: hsl(0, 0%, 95%);
+  --ds-gray-200: hsl(0, 0%, 92%);
+  --ds-gray-300: hsl(0, 0%, 90%);
+  --ds-gray-400: hsl(0, 0%, 92%);
+  --ds-gray-500: hsl(0, 0%, 79%);
+  --ds-gray-600: hsl(0, 0%, 66%);
+  --ds-gray-700: hsl(0, 0%, 56%);
+  --ds-gray-800: hsl(0, 0%, 49%);
+  --ds-gray-900: hsl(0, 0%, 40%);
+  --ds-gray-1000: hsl(0, 0%, 9%);
+
+  --ds-blue-100: hsl(212, 100%, 97%);
+  --ds-blue-400: hsl(209, 100%, 90%);
+  --ds-blue-700: hsl(212, 100%, 48%);
+  --ds-blue-900: hsl(211, 100%, 42%);
+
+  --ds-red-100: hsl(0, 100%, 97%);
+  --ds-red-400: hsl(0, 90%, 92%);
+  --ds-red-700: hsl(358, 75%, 59%);
+  --ds-red-900: hsl(358, 66%, 48%);
+
+  --ds-amber-100: hsl(39, 100%, 95%);
+  --ds-amber-400: hsl(42, 100%, 78%);
+  --ds-amber-700: hsl(39, 100%, 57%);
+  --ds-amber-900: hsl(30, 100%, 32%);
+
+  --ds-green-100: hsl(120, 60%, 96%);
+  --ds-green-400: hsl(122, 60%, 86%);
+  --ds-green-700: hsl(131, 41%, 46%);
+  --ds-green-900: hsl(133, 50%, 32%);
+
+  /* Recharts grid colour — theme-aware */
+  --chart-grid: rgba(0, 0, 0, 0.06);
+  --chart-axis: rgba(0, 0, 0, 0.12);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+.dark {
+  /* ─── Semantic surfaces (DARK) ──────────────────────────────── */
+  --bg: #0a0a0a;
+  --bg-subtle: #0e0e0f;
+  --surface: #111111;
+  --surface-hover: #161616;
+  --surface-elev: #181818;
+
+  /* Borders */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  /* Text */
+  --text: #ededed;
+  --text-dim: #8a8a8a;
+  --text-subtle: #666666;
+
+  /* Brand + semantic accents (dark mode versions) */
+  --accent: #8b7cf0;
+  --accent-soft: rgba(139, 124, 240, 0.14);
+
+  --emerald: #10b981;
+  --emerald-soft: rgba(16, 185, 129, 0.14);
+  --red: #ef4444;
+  --red-soft: rgba(239, 68, 68, 0.14);
+  --orange: #f97316;
+  --orange-soft: rgba(249, 115, 22, 0.14);
+  --amber: #f59e0b;
+  --amber-soft: rgba(245, 158, 11, 0.14);
+  --blue: #3b82f6;
+  --blue-soft: rgba(59, 130, 246, 0.14);
+  --violet: #8b5cf6;
+  --violet-soft: rgba(139, 92, 246, 0.14);
+
+  /* Sidebar tokens (dark) */
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #a1a1a1;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #fafafa;
+
+  /* Geist palette (DARK) */
+  --ds-gray-100: hsl(0, 0%, 10%);
+  --ds-gray-200: hsl(0, 0%, 12%);
+  --ds-gray-300: hsl(0, 0%, 16%);
+  --ds-gray-400: hsl(0, 0%, 18%);
+  --ds-gray-500: hsl(0, 0%, 27%);
+  --ds-gray-600: hsl(0, 0%, 53%);
+  --ds-gray-700: hsl(0, 0%, 56%);
+  --ds-gray-800: hsl(0, 0%, 49%);
+  --ds-gray-900: hsl(0, 0%, 63%);
+  --ds-gray-1000: hsl(0, 0%, 93%);
+
+  --ds-blue-100: hsl(216, 50%, 12%);
+  --ds-blue-400: hsl(212, 78%, 23%);
+  --ds-blue-700: hsl(212, 100%, 48%);
+  --ds-blue-900: hsl(210, 100%, 66%);
+
+  --ds-red-100: hsl(357, 37%, 12%);
+  --ds-red-400: hsl(357, 55%, 26%);
+  --ds-red-700: hsl(358, 75%, 59%);
+  --ds-red-900: hsl(358, 100%, 69%);
+
+  --ds-amber-100: hsl(35, 100%, 8%);
+  --ds-amber-400: hsl(35, 100%, 17%);
+  --ds-amber-700: hsl(39, 100%, 57%);
+  --ds-amber-900: hsl(39, 90%, 50%);
+
+  --ds-green-100: hsl(136, 50%, 9%);
+  --ds-green-400: hsl(135, 70%, 16%);
+  --ds-green-700: hsl(131, 41%, 46%);
+  --ds-green-900: hsl(131, 43%, 57%);
+
+  /* Recharts grid colour — dark mode */
+  --chart-grid: rgba(255, 255, 255, 0.05);
+  --chart-axis: rgba(255, 255, 255, 0.10);
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-elev: var(--surface-elev);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-foreground: var(--text);
+  --color-text-dim: var(--text-dim);
+  --color-text-subtle: var(--text-subtle);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-emerald: var(--emerald);
+  --color-emerald-soft: var(--emerald-soft);
+  --color-red: var(--red);
+  --color-red-soft: var(--red-soft);
+  --color-orange: var(--orange);
+  --color-orange-soft: var(--orange-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-blue: var(--blue);
+  --color-blue-soft: var(--blue-soft);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-kaspi: var(--kaspi);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Base
+   ═══════════════════════════════════════════════════════════════ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings:
+    "cv11",
+    "ss01",
+    "cv02",
+    "cv03";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+}
+
+.mono {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Scrollbar — theme-aware */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Recharts customization — theme-aware */
+.recharts-cartesian-grid line {
+  stroke: var(--chart-grid);
+}
+.recharts-cartesian-axis-line {
+  stroke: var(--chart-axis);
+}
+.recharts-text {
+  fill: var(--text-dim);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.recharts-tooltip-wrapper:focus-visible {
+  outline: none;
+}
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Mock-данные плашка — используется на AI-инсайтах */
+.mock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--amber);
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  border-radius: 999px;
+}
