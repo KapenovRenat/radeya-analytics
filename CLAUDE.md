@@ -1,1 +1,9 @@
 @AGENTS.md
+@Brain/AGENTS.md
+@Brain/index.md
+@Brain/wiki/project.md
+@Brain/wiki/owner.md
+@Brain/wiki/kaspi-rnp.md
+@Brain/wiki/kaspi-metrics.md
+@Brain/wiki/rnp-feature.md
+@Brain/wiki/decisions.md
