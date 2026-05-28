@@ -76,6 +76,17 @@ export async function SidebarServer() {
       ],
     },
     {
+      id: "advertising",
+      title: "Реклама",
+      defaultOpen: true,
+      items: [
+        { href: p("/ad/upload"), label: "Загрузка CSV", iconName: "Upload" },
+        { href: p("/ad/campaigns"), label: "По компаниям", iconName: "Megaphone" },
+        { href: p("/ad/products"), label: "По товарам", iconName: "Package" },
+        { href: p("/ad"), label: "Сводка", iconName: "BarChart2" },
+      ],
+    },
+    {
       id: "reports",
       title: "Отчёты",
       defaultOpen: false,

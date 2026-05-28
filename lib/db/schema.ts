@@ -156,6 +156,160 @@ export const kaspiEntriesSyncState = pgTable("kaspi_entries_sync_state", {
     .default(sql`now()`),
 });
 
+// ─── Kaspi Advertising (ad_*) ────────────────────────────────────────────────
+
+/**
+ * Рекламные кампании Kaspi.
+ * Общий справочник: и для РНП-контроля, и для будущего API Kaspi Marketing.
+ * status: "on" | "off"
+ * rating: "good" | "normal" | "bad" | "no_data"
+ */
+export const adCampaigns = pgTable(
+  "ad_campaigns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("on"), // on | off
+    improveCard: text("improve_card").default("no"), // "yes" | "no" | "maybe"
+    hasReviews: boolean("has_reviews").default(false),
+    hasDiscount: boolean("has_discount").default(false),
+    inStock: boolean("in_stock").default(false),
+    hasVideo: boolean("has_video").default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_ad_campaigns_store_name").on(t.storeId, t.name),
+    index("ad_campaigns_store_idx").on(t.storeId),
+  ],
+);
+
+/**
+ * Метрики кампании по неделям (и итог за месяц).
+ * is_monthly_total = true → строка «Итого за месяц».
+ * revenue заполняется только для итоговой строки.
+ */
+export const adWeeklyStats = pgTable(
+  "ad_weekly_stats",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => adCampaigns.id, { onDelete: "cascade" }),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
+    weekEnd: timestamp("week_end", { withTimezone: true }).notNull(),
+    isMonthlyTotal: boolean("is_monthly_total").notNull().default(false),
+    spent: doublePrecision("spent").default(0),
+    dailyBudget: doublePrecision("daily_budget").default(0),
+    targetClick: doublePrecision("target_click").default(0), // установленная цена за клик (вручную)
+    avgClick: doublePrecision("avg_click").default(0),
+    orders: integer("orders").default(0),
+    revenue: doublePrecision("revenue").default(0),
+    drrPct: doublePrecision("drr_pct").default(0),
+    ctrPct: doublePrecision("ctr_pct").default(0),
+    convCartPct: doublePrecision("conv_cart_pct").default(0),
+    convFavPct: doublePrecision("conv_fav_pct").default(0),
+    rating: text("rating").default("no_data"), // good | normal | bad | no_data
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_ad_weekly_stats").on(t.campaignId, t.weekStart, t.isMonthlyTotal),
+    index("ad_weekly_stats_store_idx").on(t.storeId),
+    index("ad_weekly_stats_campaign_idx").on(t.campaignId),
+    index("ad_weekly_stats_period_idx").on(t.weekStart, t.weekEnd),
+  ],
+);
+
+/**
+ * Товары внутри рекламной кампании.
+ * Каждый SKU (название + категория) — отдельная строка.
+ */
+export const adProducts = pgTable(
+  "ad_products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => adCampaigns.id, { onDelete: "cascade" }),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    category: text("category"),
+    status: text("status").default("active"), // active | inactive
+    improveCard: text("improve_card").default("no"), // "yes" | "no" | "maybe"
+    hasReviews: boolean("has_reviews").default(false),
+    hasDiscount: boolean("has_discount").default(false),
+    inStock: boolean("in_stock").default(false),
+    hasVideo: boolean("has_video").default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_ad_products_campaign_name").on(t.campaignId, t.name),
+    index("ad_products_store_idx").on(t.storeId),
+    index("ad_products_campaign_idx").on(t.campaignId),
+    index("ad_products_category_idx").on(t.category),
+  ],
+);
+
+/**
+ * Метрики товаров по неделям.
+ * Привязаны к кампании и товару одновременно.
+ */
+export const adProductStats = pgTable(
+  "ad_product_stats",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => adProducts.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => adCampaigns.id, { onDelete: "cascade" }),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
+    weekEnd: timestamp("week_end", { withTimezone: true }).notNull(),
+    spent: doublePrecision("spent").default(0),
+    targetClick: doublePrecision("target_click").default(0), // установленная цена за клик (вручную)
+    avgClick: doublePrecision("avg_click").default(0),
+    orders: integer("orders").default(0),
+    drrPct: doublePrecision("drr_pct").default(0),
+    ctrPct: doublePrecision("ctr_pct").default(0),
+    convCartPct: doublePrecision("conv_cart_pct").default(0),
+    convFavPct: doublePrecision("conv_fav_pct").default(0),
+    rating: text("rating").default("no_data"), // good | normal | bad | no_data
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_ad_product_stats").on(t.productId, t.weekStart),
+    index("ad_product_stats_campaign_idx").on(t.campaignId),
+    index("ad_product_stats_store_idx").on(t.storeId),
+    index("ad_product_stats_period_idx").on(t.weekStart, t.weekEnd),
+  ],
+);
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type AdCampaign = typeof adCampaigns.$inferSelect;
+export type NewAdCampaign = typeof adCampaigns.$inferInsert;
+export type AdWeeklyStat = typeof adWeeklyStats.$inferSelect;
+export type NewAdWeeklyStat = typeof adWeeklyStats.$inferInsert;
+export type AdProduct = typeof adProducts.$inferSelect;
+export type NewAdProduct = typeof adProducts.$inferInsert;
+export type AdProductStat = typeof adProductStats.$inferSelect;
+export type NewAdProductStat = typeof adProductStats.$inferInsert;
+
 export type KaspiStore = typeof kaspiStores.$inferSelect;
 export type NewKaspiStore = typeof kaspiStores.$inferInsert;
 export type KaspiOrder = typeof kaspiOrders.$inferSelect;
