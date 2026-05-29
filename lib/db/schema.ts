@@ -1,5 +1,5 @@
 /**
- * Drizzle schema for niche-analytics.
+ * Drizzle schema for radeya-analytics.
  *
  * Mirrors RedStat tables (kaspi_stores, kaspi_orders) but with simplified
  * auth: no users table (Basic Auth in middleware), single-tenant for MVP.
@@ -205,6 +205,7 @@ export const adWeeklyStats = pgTable(
     weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
     weekEnd: timestamp("week_end", { withTimezone: true }).notNull(),
     isMonthlyTotal: boolean("is_monthly_total").notNull().default(false),
+    granularity: text("granularity").notNull().default("week"), // "week" | "day" | "month"
     impressions: integer("impressions").default(0),
     spent: doublePrecision("spent").default(0),
     dailyBudget: doublePrecision("daily_budget").default(0),
@@ -221,7 +222,7 @@ export const adWeeklyStats = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_ad_weekly_stats").on(t.campaignId, t.weekStart, t.isMonthlyTotal),
+    uniqueIndex("uq_ad_weekly_stats").on(t.campaignId, t.weekStart, t.isMonthlyTotal, t.granularity),
     index("ad_weekly_stats_store_idx").on(t.storeId),
     index("ad_weekly_stats_campaign_idx").on(t.campaignId),
     index("ad_weekly_stats_period_idx").on(t.weekStart, t.weekEnd),
@@ -280,6 +281,7 @@ export const adProductStats = pgTable(
       .references(() => kaspiStores.id, { onDelete: "cascade" }),
     weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
     weekEnd: timestamp("week_end", { withTimezone: true }).notNull(),
+    granularity: text("granularity").notNull().default("week"), // "week" | "day"
     impressions: integer("impressions").default(0),
     spent: doublePrecision("spent").default(0),
     targetClick: doublePrecision("target_click").default(0), // установленная цена за клик (вручную)
@@ -295,10 +297,33 @@ export const adProductStats = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_ad_product_stats").on(t.productId, t.weekStart),
+    uniqueIndex("uq_ad_product_stats").on(t.productId, t.weekStart, t.granularity),
     index("ad_product_stats_campaign_idx").on(t.campaignId),
     index("ad_product_stats_store_idx").on(t.storeId),
     index("ad_product_stats_period_idx").on(t.weekStart, t.weekEnd),
+  ],
+);
+
+/**
+ * Вручную созданные периоды (плейсхолдеры).
+ * Позволяют создать «следующую неделю» до загрузки данных.
+ * Появляются в WeekSelector наравне с реальными данными.
+ */
+export const adPeriods = pgTable(
+  "ad_periods",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
+    weekEnd: timestamp("week_end", { withTimezone: true }).notNull(),
+    granularity: text("granularity").notNull().default("week"), // "week" | "day"
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_ad_periods").on(t.storeId, t.weekStart, t.weekEnd),
+    index("ad_periods_store_idx").on(t.storeId),
   ],
 );
 

@@ -40,6 +40,7 @@ export async function ingestCampaigns(
   weekStart: Date,
   weekEnd: Date,
   isMonthlyTotal = false,
+  granularity: "week" | "day" = "week",
 ): Promise<IngestCampaignsResult> {
   const db = getDb();
   const campaignIds: Record<string, string> = {};
@@ -81,6 +82,7 @@ export async function ingestCampaigns(
         weekStart,
         weekEnd,
         isMonthlyTotal,
+        granularity,
         impressions: row.impressions,
         spent: row.spent,
         dailyBudget: 0, // filled manually by user
@@ -94,7 +96,7 @@ export async function ingestCampaigns(
         rating: row.rating,
       })
       .onConflictDoUpdate({
-        target: [adWeeklyStats.campaignId, adWeeklyStats.weekStart, adWeeklyStats.isMonthlyTotal],
+        target: [adWeeklyStats.campaignId, adWeeklyStats.weekStart, adWeeklyStats.isMonthlyTotal, adWeeklyStats.granularity],
         set: {
           impressions: row.impressions,
           spent: row.spent,
@@ -128,6 +130,7 @@ export async function ingestProducts(
   rows: ParsedProductRow[],
   weekStart: Date,
   weekEnd: Date,
+  granularity: "week" | "day" = "week",
 ): Promise<IngestProductsResult> {
   const db = getDb();
   let upserted = 0;
@@ -171,6 +174,7 @@ export async function ingestProducts(
         storeId,
         weekStart,
         weekEnd,
+        granularity,
         impressions: row.impressions,
         spent: row.spent,
         avgClick: row.avgClick,
@@ -183,7 +187,7 @@ export async function ingestProducts(
         rating: row.rating,
       })
       .onConflictDoUpdate({
-        target: [adProductStats.productId, adProductStats.weekStart],
+        target: [adProductStats.productId, adProductStats.weekStart, adProductStats.granularity],
         set: {
           impressions: row.impressions,
           spent: row.spent,

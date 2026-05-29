@@ -38,7 +38,7 @@ updated: 2026-05-28
 
 - Excel/Google Sheets — еженедельный РНП-контроль рекламы
 - Kaspi Merchant Cabinet — источник CSV данных
-- niche-analytics (этот проект) — цель: перенести аналитику сюда
+- radeya-analytics (этот проект) — цель: перенести аналитику сюда
 
 ## Связано с
 

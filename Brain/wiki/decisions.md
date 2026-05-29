@@ -14,7 +14,7 @@ updated: 2026-05-28
 ### Локальный PostgreSQL для разработки
 **Решение:** `DATABASE_URL` в `.env.local`, `POSTGRES_URL` закомментирован.  
 **Причина:** Ренат разворачивает локально без Vercel.  
-**Детали:** `postgres://postgres:kapa@localhost:5432/niche_analytics`
+**Детали:** `postgres://postgres:kapa@localhost:5432/radeya_analytics`
 
 ### Brain/ как память Claude между сессиями
 **Решение:** Папка `Brain/` в корне проекта, CLAUDE.md ссылается на неё.  

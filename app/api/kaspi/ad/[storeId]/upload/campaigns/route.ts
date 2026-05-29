@@ -46,17 +46,19 @@ export async function POST(
         continue;
       }
 
-      // Detect monthly total: period > 10 days
+      // Detect granularity and monthly total from period length
       const days = (dates.weekEnd.getTime() - dates.weekStart.getTime()) / 86_400_000;
       const isMonthlyTotal = days > 10;
+      const granularity: "week" | "day" = days === 0 ? "day" : "week";
 
-      const result = await ingestCampaigns(storeId, rows, dates.weekStart, dates.weekEnd, isMonthlyTotal);
+      const result = await ingestCampaigns(storeId, rows, dates.weekStart, dates.weekEnd, isMonthlyTotal, granularity);
 
       results.push({
         filename: file.name,
         weekStart: dates.weekStart,
         weekEnd: dates.weekEnd,
         isMonthlyTotal,
+        granularity,
         upserted: result.upserted,
       });
     } catch (err) {

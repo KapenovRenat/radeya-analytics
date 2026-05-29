@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Basic Auth for all routes except /api/health.
- * Supports multiple users via NICHE_USER/NICHE_PASS (primary) and
- * NICHE_USER_2/NICHE_PASS_2 (secondary — e.g. for a partner / client demo).
+ * Supports multiple users via RADEYA_USER/RADEYA_PASS (primary) and
+ * RADEYA_USER_2/RADEYA_PASS_2 (secondary — e.g. for a partner / client demo).
  * Add more pairs by extending the PAIRS array below.
  */
 export function middleware(req: NextRequest) {
@@ -15,14 +15,14 @@ export function middleware(req: NextRequest) {
   if (process.env.PUBLIC_DEMO !== undefined) return NextResponse.next();
 
   const pairs = [
-    [process.env.NICHE_USER, process.env.NICHE_PASS],
-    [process.env.NICHE_USER_2, process.env.NICHE_PASS_2],
+    [process.env.RADEYA_USER, process.env.RADEYA_PASS],
+    [process.env.RADEYA_USER_2, process.env.RADEYA_PASS_2],
   ].filter((p): p is [string, string] => !!p[0] && !!p[1]);
 
   if (pairs.length === 0) {
     if (process.env.NODE_ENV === "production") {
       return new NextResponse(
-        "Server misconfigured: NICHE_USER/NICHE_PASS not set",
+        "Server misconfigured: RADEYA_USER/RADEYA_PASS not set",
         { status: 500 },
       );
     }
@@ -38,7 +38,7 @@ export function middleware(req: NextRequest) {
   if (!matched) {
     return new NextResponse("Authentication required", {
       status: 401,
-      headers: { "WWW-Authenticate": 'Basic realm="niche-analytics"' },
+      headers: { "WWW-Authenticate": 'Basic realm="radeya-analytics"' },
     });
   }
   return NextResponse.next();

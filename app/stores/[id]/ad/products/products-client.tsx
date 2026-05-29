@@ -50,6 +50,7 @@ interface Product {
 interface Period {
   weekStart: string;
   weekEnd: string;
+  granularity?: string;
 }
 
 interface CampaignOption {
@@ -797,7 +798,7 @@ export function ProductsClient({ storeId }: { storeId: string }) {
                 {periods.map((p) => (
                   <th key={p.weekStart} colSpan={COLS}
                     className="border-l border-[var(--border)] px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)] whitespace-nowrap">
-                    {fmtWeekLabel(p.weekStart, p.weekEnd)}
+                    {fmtWeekLabel(p.weekStart, p.weekEnd, p.granularity)}
                   </th>
                 ))}
               </tr>

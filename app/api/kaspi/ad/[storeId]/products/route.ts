@@ -84,12 +84,12 @@ export async function GET(
     statsByProduct.get(s.productId)!.push(s);
   }
 
-  // Collect unique periods
-  const periodsMap = new Map<string, { weekStart: Date; weekEnd: Date }>();
+  // Collect unique periods (include granularity)
+  const periodsMap = new Map<string, { weekStart: Date; weekEnd: Date; granularity: string }>();
   for (const s of stats) {
     const key = s.weekStart.toISOString();
     if (!periodsMap.has(key)) {
-      periodsMap.set(key, { weekStart: s.weekStart, weekEnd: s.weekEnd });
+      periodsMap.set(key, { weekStart: s.weekStart, weekEnd: s.weekEnd, granularity: s.granularity ?? "week" });
     }
   }
   const periods = Array.from(periodsMap.values()).sort(

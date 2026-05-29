@@ -1,5 +1,63 @@
 # CHANGELOG
 
+## 2026-05-29 (сессия 13)
+
+- **Баг: исчезновение плейсхолдера недели** — ключ дедупликации в `/weeks` API изменён с `weekStart` на `weekStart__weekEnd`; теперь недельный период (25 мая — 31 мая) и дневная запись (25 мая — 25 мая) не затирают друг друга
+- **WeekSelector — группировка дней по неделям:** дни с `granularity='day'` теперь показываются как дочерние элементы внутри недели-контейнера
+  - Если есть явный плейсхолдер (из `ad_periods`) — дни группируются под ним
+  - Если плейсхолдера нет — авто-группировка по календарной неделе (Пн–Вс)
+  - Заголовок группы: кликабельный чекбокс (выбрать/снять все дни), бейдж «N дн.», стрелка разворота
+  - Удаление работает на уровне отдельного дня
+  - Группы с днями разворачиваются автоматически при открытии
+- **Модалка товаров:** убран отдельный вызов `/weeks`; `availableWeeks` теперь берётся из `periods` ответа `/products?campaignId=...` (только недели с реальными данными по этой кампании); фильтрация client-side
+- TypeScript: 0 ошибок; `next build` — успешно
+
+## 2026-05-29 (сессия 12)
+
+- **Модалка товаров — WeekSelector + сравнение:** `CampaignProductsModal` получила собственный выбор недель и кнопку «Сравнить N пер.»
+- Добавлены `localSelectedWeeks`, `availableWeeks`, `weeksLoading` — загружает доступные недели из `/api/kaspi/ad/[storeId]/weeks`, начальные значения берутся из `selectedWeeks` prop
+- WeekSelector отображается в фильтр-баре модалки (независимо от родительской страницы)
+- Кнопка «Сравнить N пер.» появляется при ≥2 выбранных периодах
+- Новый компонент `ProductCompareModal`: агрегирует метрики всех товаров по каждому периоду, показывает таблицу Δ + спарклайны (Recharts), `z-[60]` чтобы рендерился поверх модалки
+- `COMPARE_METRICS`: Расход/Показы/Заказы/ДРР%/CTR%/Конв→корз%/Конв→изб%/Ср.клик
+- `GET /api/kaspi/ad/[storeId]/products`: `periods` теперь включает `granularity`
+- TypeScript: 0 ошибок; `next build` — успешно
+
+## 2026-05-29 (сессия 11)
+
+- **Фича: Дневная разбивка (Feature 2)** — полная реализация
+- **БД:** `drizzle-kit push` — применены изменения схемы (`granularity` в `ad_weekly_stats` / `ad_product_stats`, новая таблица `ad_periods`)
+- **`lib/ad/ingest.ts`:** параметр `granularity: "week" | "day" = "week"` в обеих функциях; `onConflictDoUpdate` target обновлён под новые уникальные индексы
+- **Upload routes** (campaigns + products): авто-детект `granularity` из длины периода (`days === 0` → "day")
+- **`GET /api/kaspi/ad/[storeId]/weeks`:** теперь объединяет периоды из `ad_weekly_stats` + `ad_periods`, возвращает `granularity`
+- **`POST /api/kaspi/ad/[storeId]/periods`:** новый endpoint — создание ручного периода-плейсхолдера в `ad_periods`
+- **`DELETE /api/kaspi/ad/[storeId]/reset`:** при `target=all` и `target=week` также удаляет из `ad_periods`
+- **`GET /api/kaspi/ad/[storeId]/campaigns`:** `periods` теперь включает `granularity`
+- **`WeekOption`:** добавлен `granularity: "week" | "day"`
+- **`fmtWeekLabel()`:** поддержка дневного формата — «пн, 26 мая 2026» при `granularity==="day"` или `weekStart===weekEnd`; добавлен 3-й аргумент `granularity?`
+- **`WeekSelector`:** добавлен бейдж «день» на дневных периодах; кнопка «Создать период» с inline-формой (С/По дата-инпуты, авто-детект день/неделя)
+- **`campaigns-client.tsx`:** `Period` +`granularity`; `handleCreatePeriod` callback; `onCreatePeriod` передаётся в `WeekSelector`; заголовки колонок используют `fmtWeekLabel` с `granularity`
+- **`campaign-products-modal.tsx`:** `Period` +`granularity`; `fmtWeekLabel` с `granularity`
+- **`products-client.tsx`:** `Period` +`granularity`; `fmtWeekLabel` с `granularity`
+- TypeScript: 0 ошибок; `next build` — успешно
+
+## 2026-05-29 (сессия 10)
+
+- **Фича: Товары в модалке кампании** — реализовано
+- Сайдбар: убран пункт «По товарам», порядок Реклама → Сводка / По компаниям / Загрузка CSV
+- Новый компонент `components/ad/campaign-products-modal.tsx` — полная таблица товаров с группировкой по категориям, поиском, сортировкой, inline-редактированием, итогами
+- `campaigns-client.tsx`: кнопка «📦 Товары» под названием каждой кампании → открывает модалку; selectedWeeks передаются автоматически
+- TypeScript: 0 ошибок
+
+## 2026-05-29 (сессия 9)
+
+- Переименование проекта: `niche-analytics` → `radeya-analytics` везде в исходниках
+- `package.json`: `name` обновлён
+- `.env.local` / `.env.example`: переменные `NICHE_USER/NICHE_PASS` → `RADEYA_USER/RADEYA_PASS`; DB `niche_analytics` → `radeya_analytics`
+- `middleware.ts`: переменные + realm обновлены
+- `Brain/`: все wiki-страницы и AGENTS.md обновлены
+- ⚠️ Требует: переименовать папку `G:\Apps\niche-analytics` → `radeya-analytics`; переименовать БД в PostgreSQL (`ALTER DATABASE niche_analytics RENAME TO radeya_analytics`)
+
 ## 2026-05-29 (сессия 8)
 
 - Спроектирована фича «Загрузка и просмотр по дням» — UX согласован с Ренатом

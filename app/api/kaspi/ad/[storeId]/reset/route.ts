@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { adCampaigns, adWeeklyStats, adProductStats } from "@/lib/db/schema";
+import { adCampaigns, adWeeklyStats, adProductStats, adPeriods } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +29,10 @@ export async function DELETE(
   if (target === "all") {
     // Cascade: adCampaigns → adWeeklyStats, adProducts → adProductStats
     await db.delete(adCampaigns).where(eq(adCampaigns.storeId, storeId));
+    // Also remove manual period placeholders
+    await db.delete(adPeriods).where(eq(adPeriods.storeId, storeId));
   } else if (target === "stats") {
-    // Keep campaigns + products, wipe only stats rows
+    // Keep campaigns + products, wipe only stats rows (keep manual periods)
     await db.delete(adWeeklyStats).where(eq(adWeeklyStats.storeId, storeId));
     await db.delete(adProductStats).where(eq(adProductStats.storeId, storeId));
   } else if (target === "week") {
@@ -44,6 +46,10 @@ export async function DELETE(
     );
     await db.delete(adProductStats).where(
       and(eq(adProductStats.storeId, storeId), eq(adProductStats.weekStart, weekDate)),
+    );
+    // Also remove the manual period placeholder for this week (if any)
+    await db.delete(adPeriods).where(
+      and(eq(adPeriods.storeId, storeId), eq(adPeriods.weekStart, weekDate)),
     );
   }
 

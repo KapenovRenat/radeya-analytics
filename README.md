@@ -1,13 +1,13 @@
-# niche-analytics
+# radeya-analytics
 
-Marketplace niche analytics platform. Standalone port of the Kaspi seller-cabinet
-digitization flow from RedStat. Next.js 16 + Vercel Postgres + Drizzle.
+Marketplace analytics platform for Kaspi.kz sellers. Standalone port of the digitization flow from RedStat. Next.js 16 + PostgreSQL + Drizzle.
 
 ## Что умеет (MVP)
 
 - Подключить Kaspi-магазин по `X-Auth-Token` (шифруется Fernet-совместимо с Python)
 - Синхронизация заказов за любой период (chunked, по 3 дня за вызов, без Vercel timeout)
 - Дашборд на один магазин: 10 аналитических разрезов (выручка, статусы, платежи, доставка, топ-города, топ-клиенты, кредит…)
+- Раздел РНП (Реклама): загрузка CSV, понедельная динамика, сравнение недель
 - Basic Auth для всего UI и API (кроме `/api/health`)
 
 ## Локальный запуск
@@ -21,10 +21,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 # 3. Скопировать .env.example в .env.local, заполнить:
 cp .env.example .env.local
-# POSTGRES_URL=postgres://... (или DATABASE_URL для локального Postgres)
+# DATABASE_URL=postgres://postgres:pass@localhost:5432/radeya_analytics
 # JWT_SECRET_KEY=...
-# NICHE_USER=almas
-# NICHE_PASS=...
+# RADEYA_USER=renat
+# RADEYA_PASS=...
 
 # 4. Применить миграции
 npx drizzle-kit push
@@ -33,7 +33,7 @@ npx drizzle-kit push
 npm run dev
 ```
 
-Открыть http://localhost:3000 — Basic Auth по `NICHE_USER` / `NICHE_PASS`.
+Открыть http://localhost:3000 — Basic Auth по `RADEYA_USER` / `RADEYA_PASS`.
 
 ## Как добавить магазин
 
@@ -57,11 +57,9 @@ npm run dev
 Правильный процесс:
 
 1. Выгрузить все токены клиентов в виде plain-text (через recovery с их стороны или резервной копии ключа)
-2. Ротировать `JWT_SECRET_KEY` в Vercel env
+2. Ротировать `JWT_SECRET_KEY` в env
 3. Перешифровать все токены новым ключом
 4. Бекапнуть новый ключ в password manager
-
-Если в БД есть строки, которые нечем расшифровать — удалить и попросить клиентов заново подать токены через форму.
 
 ## Архитектура
 
@@ -91,18 +89,30 @@ GET /api/kaspi/analytics/[storeId] ← 10 aggregates in parallel
 - `lib/kaspi/mapper.ts` — Kaspi JSON → DB row
 - `lib/kaspi/sync.ts` — chunked sync stateful
 - `lib/kaspi/aggregates.ts` — 10 SQL-агрегатов
-- `lib/db/schema.ts` — 3 таблицы: stores, orders, sync_state
+- `lib/db/schema.ts` — таблицы: stores, orders, sync_state, ad_*
+- `lib/ad/csv-parser.ts` — парсер CSV Kaspi рекламы
+- `lib/ad/ingest.ts` — upsert слой для рекламных данных
+
+## Deploy на сервере
+
+```bash
+npm run build
+npm run start  # порт 3000
+
+# Через PM2:
+pm2 start npm --name "radeya-analytics" -- start
+pm2 save
+```
 
 ## Deploy на Vercel
 
 ```bash
 vercel link --yes
 # В Vercel dashboard: Storage → Create Database → Postgres → link
-# Env vars (printf важен — echo добавляет \n):
+# Env vars:
 printf "%s" "$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")" | vercel env add JWT_SECRET_KEY production
-printf "%s" "almas" | vercel env add NICHE_USER production
-printf "%s" "<password>" | vercel env add NICHE_PASS production
-# (Повторить для preview и development)
+printf "%s" "renat" | vercel env add RADEYA_USER production
+printf "%s" "<password>" | vercel env add RADEYA_PASS production
 
 # Применить миграцию к прод БД:
 vercel env pull .env.production.local

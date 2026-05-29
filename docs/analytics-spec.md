@@ -1,6 +1,6 @@
 # Enterprise Analytics Spec — Kaspi Seller Cabinet
 
-> Спецификация аналитического модуля niche-analytics. Следует канонам
+> Спецификация аналитического модуля radeya-analytics. Следует канонам
 > Tufte, Few, Munzner и практике Vercel / Linear / Stripe dashboards.
 > Документ — источник правды для имплементации 7 табов.
 

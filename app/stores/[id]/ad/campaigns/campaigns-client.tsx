@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Loader2, RefreshCw, ChevronDown, Search, X,
-  ArrowUpDown, GitCompareArrows,
+  ArrowUpDown, GitCompareArrows, Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WeekSelector, fmtWeekLabel, type WeekOption } from "@/components/ad/week-selector";
@@ -11,6 +11,7 @@ import {
   LineChart, Line, ResponsiveContainer, Tooltip,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { CampaignProductsModal } from "@/components/ad/campaign-products-modal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ interface Period {
   weekStart: string;
   weekEnd: string;
   isMonthlyTotal: boolean;
+  granularity: string;
 }
 
 type SortKey = "" | "spent" | "impressions" | "orders" | "ctrPct" | "drrPct" | "dailyBudget" | "convCartPct";
@@ -374,6 +376,7 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("");
   const [compareOpen, setCompareOpen] = useState(false);
+  const [productsCampaign, setProductsCampaign] = useState<{ id: string; name: string } | null>(null);
 
   // Load available weeks (extracted to useCallback so handleDeleteWeek can call it)
   const loadWeeks = useCallback(() => {
@@ -401,6 +404,19 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
       { method: "DELETE" },
     );
     loadWeeks(); // reloads weeks list, which triggers load() via the effect
+  }, [storeId, loadWeeks]);
+
+  const handleCreatePeriod = useCallback(async (
+    weekStart: string,
+    weekEnd: string,
+    granularity: "week" | "day",
+  ) => {
+    await fetch(`/api/kaspi/ad/${storeId}/periods`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekStart, weekEnd, granularity }),
+    });
+    loadWeeks(); // refresh — new period appears in WeekSelector
   }, [storeId, loadWeeks]);
 
   // Load campaigns whenever selected weeks change
@@ -499,6 +515,7 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
             onChange={setSelectedWeeks}
             loading={weeksLoading}
             onDelete={handleDeleteWeek}
+            onCreatePeriod={handleCreatePeriod}
           />
 
           {/* Search */}
@@ -605,7 +622,7 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
 
                 {weekPeriods.map((p) => (
                   <th key={p.weekStart} colSpan={11} className="border-l border-[var(--border)] px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)] whitespace-nowrap">
-                    {fmtWeekLabel(p.weekStart, p.weekEnd)}
+                    {fmtWeekLabel(p.weekStart, p.weekEnd, p.granularity)}
                   </th>
                 ))}
                 {monthPeriods.map((p) => (
@@ -647,6 +664,13 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
                     {/* Name */}
                     <td className="sticky left-0 z-10 bg-[var(--bg)] px-4 py-2 font-medium text-[var(--text)] min-w-[220px] max-w-[280px]">
                       <span className="block truncate" title={c.name}>{c.name}</span>
+                      <button
+                        onClick={() => setProductsCampaign({ id: c.id, name: c.name })}
+                        className="mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-dim)] hover:bg-white/10 hover:text-[var(--text)] transition-colors"
+                      >
+                        <Package className="h-3 w-3" />
+                        Товары
+                      </button>
                     </td>
 
                     {/* Status */}
@@ -781,6 +805,17 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
           campaigns={filtered}
           periods={periods}
           onClose={() => setCompareOpen(false)}
+        />
+      )}
+
+      {/* Products modal */}
+      {productsCampaign && (
+        <CampaignProductsModal
+          storeId={storeId}
+          campaignId={productsCampaign.id}
+          campaignName={productsCampaign.name}
+          selectedWeeks={selectedWeeks}
+          onClose={() => setProductsCampaign(null)}
         />
       )}
     </>

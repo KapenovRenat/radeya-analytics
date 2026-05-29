@@ -1,11 +1,11 @@
 ---
-aliases: [niche-analytics, проект]
+aliases: [radeya-analytics, проект]
 tags: [проект, nextjs, kaspi]
 created: 2026-05-28
-updated: 2026-05-28
+updated: 2026-05-29
 ---
 
-# niche-analytics
+# radeya-analytics
 
 > Платформа аналитики для продавцов Kaspi.kz. Standalone-порт потока оцифровки из RedStat.
 
@@ -23,11 +23,11 @@ updated: 2026-05-28
 
 ### Локальный запуск
 
-- Папка: `G:\Apps\niche-analytics`
-- БД: `postgres://postgres:kapa@localhost:5432/niche_analytics`
+- Папка: `G:\Apps\niche-analytics` (переименовать в `radeya-analytics` при удобстве)
+- БД: `postgres://postgres:kapa@localhost:5432/radeya_analytics`
 - `.env.local`: `DATABASE_URL` заполнен, `POSTGRES_URL` закомментирован
 - Запуск: `npm run dev` → http://localhost:3000
-- Логин: `renat` / `kapa1234` (из `.env.local`)
+- Логин: `renat` / `kapa1234` (из `.env.local`, переменные `RADEYA_USER` / `RADEYA_PASS`)
 
 ### Архитектура
 
@@ -63,7 +63,7 @@ Kaspi API
 ## Связано с
 
 - [[owner]] — владелец проекта, бизнес Radeya
-- [[rnp-feature]] — планируемый раздел РНП
+- [[rnp-feature]] — раздел РНП (в разработке)
 
 ## Источник
 

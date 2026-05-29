@@ -64,13 +64,17 @@ export async function POST(
         continue;
       }
 
-      const result = await ingestProducts(storeId, campaignId, rows, dates.weekStart, dates.weekEnd);
+      const days = (dates.weekEnd.getTime() - dates.weekStart.getTime()) / 86_400_000;
+      const granularity: "week" | "day" = days === 0 ? "day" : "week";
+
+      const result = await ingestProducts(storeId, campaignId, rows, dates.weekStart, dates.weekEnd, granularity);
 
       results.push({
         filename: file.name,
         campaignId,
         weekStart: dates.weekStart,
         weekEnd: dates.weekEnd,
+        granularity,
         upserted: result.upserted,
       });
     } catch (err) {

@@ -72,7 +72,7 @@ export async function GET(
   }
 
   // Collect all unique periods (non-monthly first, then monthly)
-  const periodsMap = new Map<string, { weekStart: Date; weekEnd: Date; isMonthlyTotal: boolean }>();
+  const periodsMap = new Map<string, { weekStart: Date; weekEnd: Date; isMonthlyTotal: boolean; granularity: string }>();
   for (const s of stats) {
     const key = `${s.weekStart.toISOString()}_${s.isMonthlyTotal}`;
     if (!periodsMap.has(key)) {
@@ -80,6 +80,7 @@ export async function GET(
         weekStart: s.weekStart,
         weekEnd: s.weekEnd,
         isMonthlyTotal: s.isMonthlyTotal ?? false,
+        granularity: s.granularity ?? "week",
       });
     }
   }
