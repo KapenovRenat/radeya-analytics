@@ -2,7 +2,7 @@
 aliases: [раздел РНП, реклама в приложении]
 tags: [feature, rnp, разработка]
 created: 2026-05-28
-updated: 2026-05-28
+updated: 2026-05-29
 ---
 
 # Фича: Раздел РНП в приложении
@@ -18,7 +18,7 @@ updated: 2026-05-28
 
 ### Статус
 
-**Запланировано** — план согласован 2026-05-28, реализация не начата.
+**В разработке** — план согласован 2026-05-28, все 4 страницы реализованы и работают. Идёт доработка деталей.
 
 ---
 
@@ -35,13 +35,13 @@ updated: 2026-05-28
 `id, store_id, name, status, improve_card, has_reviews, has_discount, in_stock, has_video`
 
 **`ad_weekly_stats`:**
-`id, campaign_id, week_start, week_end, spent, daily_budget, avg_click, orders, revenue, drr_pct, ctr_pct, conv_cart_pct, conv_fav_pct, rating, is_monthly_total`
+`id, campaign_id, week_start, week_end, is_monthly_total, impressions, spent, daily_budget, target_click, avg_click, orders, revenue, drr_pct, ctr_pct, conv_cart_pct, conv_fav_pct, rating`
 
 **`ad_products`:**
 `id, campaign_id, name, category, status, improve_card, has_reviews, has_discount, in_stock, has_video`
 
 **`ad_product_stats`:**
-`id, product_id, campaign_id, week_start, week_end, spent, avg_click, orders, drr_pct, ctr_pct, conv_cart_pct, conv_fav_pct, rating`
+`id, product_id, campaign_id, week_start, week_end, impressions, spent, target_click, avg_click, orders, revenue, drr_pct, ctr_pct, conv_cart_pct, conv_fav_pct, rating`
 
 ---
 
@@ -85,55 +85,46 @@ Kaspi API (future)→                               rnp_products
 
 ---
 
-### UI — 4 страницы
+### UI — 4 страницы (реализовано)
 
-**Сводка `/stores/[id]/rnp`**
-- Датапикер от / до
-- KPI стрип: Расход · ДРР% · Заказов · Выручка · CTR%
-- Графики:
-  - Расход по неделям (bar)
-  - ДРР% по неделям (line)
-  - Заказы по неделям (bar)
-  - Распределение оценок (pie: 🟢🟡🔴)
-  - Топ-10 кампаний по заказам
-  - Топ-10 кампаний по расходу
-- Сводная таблица всех кампаний с оценкой
+**Сводка `/stores/[id]/ad/summary`**
+- WeekSelector мультиселект (по умолчанию последние 4 недели)
+- KPI стрип 6 карточек: Расход · Показы · Заказы · Выручка · ДРР% · CTR%
+- Графики (Recharts): Расход по неделям (bar) · Показы по неделям (bar) · ДРР% (line) · Заказы (bar) · Распределение оценок (pie) · Топ-10 по расходу (bar)
 
-**По кампаниям `/stores/[id]/rnp/campaigns`**
-- Датапикер от / до
-- Таблица как в Excel — фикс. колонки + горизонтальный скролл по неделям:
-  - Фикс: Название · Статус · флаги (карточка/отзывы/скидка/наличие/видео)
-  - Недели: Дата нач · Дата оконч · Потрачено · Дн.бюджет · Ср.клик · Заказы/ДРР% · CTR% · Конв→корзину% · Конв→избр.% · Оценка
-  - Итого за месяц: Потрачено · Выручка · Заказов · ДРР% · CTR% · Конв→корзину% · Конв→избр.% · Оценка
-- Цветовая логика: синий=расход, красный=нет заказов, оранжевый=выручка, зелёный=есть заказы
-- Все ячейки редактируемые (inline edit → сохранение в PostgreSQL)
-- Итого строка внизу
+**По кампаниям `/stores/[id]/ad/campaigns`**
+- WeekSelector с удалением недели (trash → inline confirm) + поиск + сортировка + кнопка «Сравнить N нед.»
+- Таблица: sticky Название · Статус · флаги (5 шт.) + горизонтальный скролл
+- На каждую неделю 11 колонок: Расход · Показы · Бюджет/д · Целев.клик · Ср.клик · Заказы/ДРР% · CTR% · Конв→корз% · Конв→изб% · Выручка · Оценка
+- Выручка: read-only (amber) для недельных периодов; editable для monthly total
+- `<tfoot>` — итого по расходу/показам/заказам за каждую неделю
+- Modality: «Сравнить N нед.» — таблица агрегатов + Δ дельта + спарклайны
 
-**По товарам `/stores/[id]/rnp/products`**
-- Датапикер от / до
-- Список кампаний → клик → раскрывается
-- Внутри: группировка по категориям (КАТЕГОРИЯ: Диваны, Кресла...)
-- Колонки: Товар · Статус · флаги · [недели с метриками]
-- Итого строка по каждой кампании
-- Все ячейки редактируемые
+**По товарам `/stores/[id]/ad/products`**
+- Те же фильтры + выбор кампании + кнопка «Загрузить» (inline upload panel)
+- Группировка по категориям, сворачиваемые секции
+- На каждую неделю 10 колонок: Расход · Показы · Целев.клик · Ср.клик · Заказы/ДРР% · CTR% · Конв→корз% · Конв→изб% · Выручка · Оценка
+- Итого по категории + grand total `<tfoot>`
 
-**Загрузка `/stores/[id]/rnp/upload`**
-- Два bulk upload блока рядом
-- Превью: сколько файлов / недель / кампаний будет загружено
-- Кнопка подтверждения
+**Загрузка `/stores/[id]/ad/upload`**
+- Два drag-and-drop блока: «По кампаниям» и «По товарам»
+- Превью файлов, upsert-безопасно, результат после загрузки
+- Раздел удаления: «Удалить все данные» (cascade) / «Удалить только статистику»
 
 ---
 
 ### API Routes
 
 ```
-GET   /api/kaspi/ad/[storeId]/summary
-GET   /api/kaspi/ad/[storeId]/campaigns
-GET   /api/kaspi/ad/[storeId]/products
-POST  /api/kaspi/ad/[storeId]/upload/campaigns
-POST  /api/kaspi/ad/[storeId]/upload/products
-PATCH /api/kaspi/ad/[storeId]/campaigns/[id]
-PATCH /api/kaspi/ad/[storeId]/products/[id]
+GET    /api/kaspi/ad/[storeId]/summary                         — KPI + графики
+GET    /api/kaspi/ad/[storeId]/campaigns?weeks[]=&from=&to=    — кампании с недельной статистикой
+GET    /api/kaspi/ad/[storeId]/products?campaignId=&weeks[]=   — товары с недельной статистикой
+GET    /api/kaspi/ad/[storeId]/weeks                           — список доступных недель (desc)
+POST   /api/kaspi/ad/[storeId]/upload/campaigns                — загрузка CSV кампаний
+POST   /api/kaspi/ad/[storeId]/upload/products                 — загрузка CSV товаров
+PATCH  /api/kaspi/ad/[storeId]/campaigns   body: {type, id, field, value}
+PATCH  /api/kaspi/ad/[storeId]/products    body: {type, id, field, value}
+DELETE /api/kaspi/ad/[storeId]/reset?target=all|stats|week     — очистка данных
 ```
 
 ---

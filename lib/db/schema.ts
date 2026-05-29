@@ -205,6 +205,7 @@ export const adWeeklyStats = pgTable(
     weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
     weekEnd: timestamp("week_end", { withTimezone: true }).notNull(),
     isMonthlyTotal: boolean("is_monthly_total").notNull().default(false),
+    impressions: integer("impressions").default(0),
     spent: doublePrecision("spent").default(0),
     dailyBudget: doublePrecision("daily_budget").default(0),
     targetClick: doublePrecision("target_click").default(0), // установленная цена за клик (вручную)
@@ -279,10 +280,12 @@ export const adProductStats = pgTable(
       .references(() => kaspiStores.id, { onDelete: "cascade" }),
     weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
     weekEnd: timestamp("week_end", { withTimezone: true }).notNull(),
+    impressions: integer("impressions").default(0),
     spent: doublePrecision("spent").default(0),
     targetClick: doublePrecision("target_click").default(0), // установленная цена за клик (вручную)
     avgClick: doublePrecision("avg_click").default(0),
     orders: integer("orders").default(0),
+    revenue: doublePrecision("revenue").default(0),
     drrPct: doublePrecision("drr_pct").default(0),
     ctrPct: doublePrecision("ctr_pct").default(0),
     convCartPct: doublePrecision("conv_cart_pct").default(0),

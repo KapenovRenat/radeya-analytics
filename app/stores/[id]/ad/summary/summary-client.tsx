@@ -27,6 +27,7 @@ interface WeeklyPoint {
   weekStart: string;
   weekEnd: string;
   spent: number;
+  impressions: number;
   orders: number;
   revenue: number;
   drrPct: number | null;
@@ -47,6 +48,7 @@ interface RatingDist {
 
 interface Kpi {
   totalSpent: number;
+  totalImpressions: number;
   totalOrders: number;
   totalRevenue: number;
   avgDrr: number | null;
@@ -181,6 +183,7 @@ export function SummaryClient({ storeId }: { storeId: string }) {
   const chartData = weekly.map((w) => ({
     label: fmtDate(w.weekStart),
     Расход: w.spent,
+    Показы: w.impressions,
     Заказы: w.orders,
     "ДРР%": w.drrPct,
   }));
@@ -221,9 +224,10 @@ export function SummaryClient({ storeId }: { storeId: string }) {
       {!loading && !error && kpi && (
         <>
           {/* KPI strip */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <KpiCard label="Активных кампаний" value={String(kpi.activeCampaigns)} icon={BarChart2} />
             <KpiCard label="Расход" value={fmt(kpi.totalSpent) + " ₸"} icon={Wallet} accent="--accent" />
+            <KpiCard label="Показы" value={fmt(kpi.totalImpressions)} icon={BarChart2} />
             <KpiCard label="Заказы" value={fmt(kpi.totalOrders)} icon={ShoppingCart} accent="--emerald" />
             <KpiCard
               label="Средний ДРР%"
@@ -276,9 +280,22 @@ export function SummaryClient({ storeId }: { storeId: string }) {
             </div>
           )}
 
-          {/* Orders + DRR% line chart */}
+          {/* Orders + DRR% + Impressions charts */}
           {chartData.length > 0 && (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4">
+                <h3 className="mb-4 text-[12px] font-semibold text-[var(--text-dim)] uppercase tracking-[0.06em]">Показы по неделям</h3>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={chartData} barSize={24}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--text-subtle)" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "var(--text-subtle)" }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? (v / 1000).toFixed(0) + "k" : v} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar dataKey="Показы" fill="var(--text-dim)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
               <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4">
                 <h3 className="mb-4 text-[12px] font-semibold text-[var(--text-dim)] uppercase tracking-[0.06em]">Заказы по неделям</h3>
                 <ResponsiveContainer width="100%" height={180}>
@@ -300,7 +317,6 @@ export function SummaryClient({ storeId }: { storeId: string }) {
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--text-subtle)" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10, fill: "var(--text-subtle)" }} axisLine={false} tickLine={false} tickFormatter={(v) => v + "%"} />
                     <Tooltip content={<ChartTooltip />} />
-                    {/* Reference lines for good/normal thresholds */}
                     <Line type="monotone" dataKey="ДРР%" stroke="var(--amber)" strokeWidth={2} dot={{ r: 3, fill: "var(--amber)" }} connectNulls />
                   </LineChart>
                 </ResponsiveContainer>

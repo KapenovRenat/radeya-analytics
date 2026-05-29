@@ -63,6 +63,7 @@ export async function GET(
     weekStart: string;
     weekEnd: string;
     spent: number;
+    impressions: number;
     orders: number;
     revenue: number;
     drrNumerator: number;
@@ -75,11 +76,12 @@ export async function GET(
       weekMap.set(key, {
         weekStart: s.weekStart.toISOString(),
         weekEnd: s.weekEnd.toISOString(),
-        spent: 0, orders: 0, revenue: 0, drrNumerator: 0, drrCount: 0,
+        spent: 0, impressions: 0, orders: 0, revenue: 0, drrNumerator: 0, drrCount: 0,
       });
     }
     const w = weekMap.get(key)!;
     w.spent += s.spent ?? 0;
+    w.impressions += s.impressions ?? 0;
     w.orders += s.orders ?? 0;
     w.revenue += s.revenue ?? 0;
     if (s.drrPct != null && s.drrPct > 0) {
@@ -92,6 +94,7 @@ export async function GET(
     weekStart: w.weekStart,
     weekEnd: w.weekEnd,
     spent: Math.round(w.spent),
+    impressions: w.impressions,
     orders: w.orders,
     revenue: Math.round(w.revenue),
     drrPct: w.drrCount > 0 ? parseFloat((w.drrNumerator / w.drrCount).toFixed(1)) : null,
@@ -99,6 +102,7 @@ export async function GET(
 
   // KPI totals
   const totalSpent = weekly.reduce((s, w) => s + w.spent, 0);
+  const totalImpressions = weekly.reduce((s, w) => s + w.impressions, 0);
   const totalOrders = weekly.reduce((s, w) => s + w.orders, 0);
   const totalRevenue = weekly.reduce((s, w) => s + w.revenue, 0);
   const drrWeeks = weekly.filter((w) => w.drrPct != null);
@@ -149,7 +153,7 @@ export async function GET(
     .map(([rating, count]) => ({ rating, count }));
 
   return NextResponse.json({
-    kpi: { totalSpent, totalOrders, totalRevenue, avgDrr, activeCampaigns },
+    kpi: { totalSpent, totalImpressions, totalOrders, totalRevenue, avgDrr, activeCampaigns },
     weekly,
     topCampaigns,
     ratingDist,

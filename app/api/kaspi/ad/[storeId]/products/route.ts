@@ -4,12 +4,13 @@
  * Returns products with weekly stats.
  * Query params:
  *   campaignId? — filter by campaign (omit = all campaigns)
- *   from?       — ISO date string (weekStart >=)
- *   to?         — ISO date string (weekEnd <=)
+ *   weeks[]?    — ISO weekStart strings (multi-select filter)
+ *   from?       — ISO date string (weekStart >=, fallback)
+ *   to?         — ISO date string (weekStart <=, fallback)
  *
  * Response:
  * {
- *   campaigns: { id, name }[],          // for filter dropdown
+ *   campaigns: { id, name }[],
  *   products: ProductWithStats[],
  *   periods: Period[]
  * }
@@ -18,7 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and, gte, lte, asc } from "drizzle-orm";
+import { eq, and, gte, lte, asc, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { adCampaigns, adProducts, adProductStats } from "@/lib/db/schema";
 
@@ -31,6 +32,7 @@ export async function GET(
   const { storeId } = await params;
   const { searchParams } = new URL(req.url);
   const campaignId = searchParams.get("campaignId");
+  const weeksParam = searchParams.getAll("weeks");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 
@@ -60,8 +62,12 @@ export async function GET(
   // Product stats filter
   const statsFilters = [eq(adProductStats.storeId, storeId)];
   if (campaignId) statsFilters.push(eq(adProductStats.campaignId, campaignId));
-  if (from) statsFilters.push(gte(adProductStats.weekStart, new Date(from)));
-  if (to) statsFilters.push(lte(adProductStats.weekStart, new Date(to)));
+  if (weeksParam.length > 0) {
+    statsFilters.push(inArray(adProductStats.weekStart, weeksParam.map((w) => new Date(w))) as never);
+  } else {
+    if (from) statsFilters.push(gte(adProductStats.weekStart, new Date(from)));
+    if (to) statsFilters.push(lte(adProductStats.weekStart, new Date(to)));
+  }
 
   const stats = await db
     .select()
@@ -109,10 +115,12 @@ export async function GET(
       id: s.id,
       weekStart: s.weekStart,
       weekEnd: s.weekEnd,
+      impressions: s.impressions,
       spent: s.spent,
       targetClick: s.targetClick,
       avgClick: s.avgClick,
       orders: s.orders,
+      revenue: s.revenue,
       drrPct: s.drrPct,
       ctrPct: s.ctrPct,
       convCartPct: s.convCartPct,

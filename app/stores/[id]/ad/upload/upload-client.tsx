@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Upload, FileText, CheckCircle, XCircle, Loader2, X } from "lucide-react";
+import { Upload, FileText, CheckCircle, XCircle, Loader2, X, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +24,102 @@ function parseDateFromFilename(name: string): string | null {
   if (!m) return null;
   return `${m[1]} — ${m[2]}`;
 }
+
+// ─── Delete section ───────────────────────────────────────────────────────────
+
+function DeleteSection({ storeId }: { storeId: string }) {
+  const [confirmTarget, setConfirmTarget] = useState<"all" | "stats" | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+
+  const handleDelete = async (target: "all" | "stats") => {
+    setDeleting(true);
+    setDone(null);
+    try {
+      await fetch(`/api/kaspi/ad/${storeId}/reset?target=${target}`, { method: "DELETE" });
+      setDone(target === "all" ? "Все данные удалены" : "Статистика удалена, кампании сохранены");
+    } catch {
+      setDone("Ошибка при удалении");
+    } finally {
+      setDeleting(false);
+      setConfirmTarget(null);
+    }
+  };
+
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-[var(--red)]/30 bg-[var(--red-soft)]/20 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 text-[var(--red)]" />
+        <h3 className="text-[13px] font-semibold text-[var(--text)]">Удаление данных</h3>
+      </div>
+      <p className="mb-4 text-[12px] text-[var(--text-dim)]">
+        Операции необратимы. Используй только если хочешь загрузить данные заново.
+      </p>
+
+      <div className="flex flex-wrap gap-3">
+        {/* Delete all */}
+        {confirmTarget === "all" ? (
+          <div className="flex items-center gap-2 rounded-[var(--radius)] border border-[var(--red)]/40 bg-[var(--red-soft)] px-3 py-2">
+            <span className="text-[12px] text-[var(--red)]">Удалить ВСЁ? Это нельзя отменить.</span>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmTarget(null)} disabled={deleting}>Отмена</Button>
+            <Button
+              size="sm"
+              className="bg-[var(--red)] text-white hover:opacity-90"
+              onClick={() => handleDelete("all")}
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Да, удалить
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="border border-[var(--red)]/40 text-[var(--red)] hover:bg-[var(--red-soft)]"
+            onClick={() => setConfirmTarget("all")}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Удалить все данные
+          </Button>
+        )}
+
+        {/* Delete stats only */}
+        {confirmTarget === "stats" ? (
+          <div className="flex items-center gap-2 rounded-[var(--radius)] border border-[var(--amber)]/40 bg-[var(--amber-soft)]/20 px-3 py-2">
+            <span className="text-[12px] text-[var(--amber)]">Удалить только статистику? Кампании останутся.</span>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmTarget(null)} disabled={deleting}>Отмена</Button>
+            <Button
+              size="sm"
+              className="bg-[var(--amber)] text-white hover:opacity-90"
+              onClick={() => handleDelete("stats")}
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Да, удалить
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="border border-[var(--amber)]/40 text-[var(--amber)] hover:bg-[var(--amber-soft)]/20"
+            onClick={() => setConfirmTarget("stats")}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Удалить только статистику
+          </Button>
+        )}
+      </div>
+
+      {done && (
+        <p className="mt-3 text-[12px] text-[var(--emerald)]">✓ {done}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Upload block ─────────────────────────────────────────────────────────────
 
 export function UploadCampaignsClient({ storeId }: { storeId: string }) {
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -119,12 +215,8 @@ export function UploadCampaignsClient({ storeId }: { storeId: string }) {
       >
         <Upload className="h-8 w-8 text-[var(--text-dim)]" />
         <div className="text-center">
-          <p className="text-[14px] font-medium text-[var(--text)]">
-            Перетащи CSV файлы сюда
-          </p>
-          <p className="mt-1 text-[12px] text-[var(--text-dim)]">
-            или кликни чтобы выбрать · только .csv · можно несколько
-          </p>
+          <p className="text-[14px] font-medium text-[var(--text)]">Перетащи CSV файлы сюда</p>
+          <p className="mt-1 text-[12px] text-[var(--text-dim)]">или кликни чтобы выбрать · только .csv · можно несколько</p>
         </div>
         <input
           ref={inputRef}
@@ -149,15 +241,11 @@ export function UploadCampaignsClient({ storeId }: { storeId: string }) {
             >
               <FileText className="h-4 w-4 shrink-0 text-[var(--text-dim)]" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[12px] font-medium text-[var(--text)]">
-                  {file.name}
-                </p>
+                <p className="truncate text-[12px] font-medium text-[var(--text)]">{file.name}</p>
                 {dateRange ? (
                   <p className="text-[11px] text-[var(--text-dim)]">📅 {dateRange}</p>
                 ) : (
-                  <p className="text-[11px] text-[var(--red)]">
-                    ⚠ Не удалось определить период из названия
-                  </p>
+                  <p className="text-[11px] text-[var(--red)]">⚠ Не удалось определить период из названия</p>
                 )}
               </div>
               <button
@@ -173,20 +261,9 @@ export function UploadCampaignsClient({ storeId }: { storeId: string }) {
 
       {/* Upload button */}
       {files.length > 0 && (
-        <Button
-          variant="primary"
-          onClick={handleUpload}
-          disabled={uploading}
-          className="self-start"
-        >
-          {uploading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Upload className="h-4 w-4" />
-          )}
-          {uploading
-            ? "Загружаем..."
-            : `Загрузить ${files.length} файл${files.length > 1 ? "а" : ""}`}
+        <Button variant="primary" onClick={handleUpload} disabled={uploading} className="self-start">
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          {uploading ? "Загружаем..." : `Загрузить ${files.length} файл${files.length > 1 ? "а" : ""}`}
         </Button>
       )}
 
@@ -218,21 +295,16 @@ export function UploadCampaignsClient({ storeId }: { storeId: string }) {
                   : "border-[var(--emerald)]/30 bg-[var(--emerald-soft)]/30",
               )}
             >
-              {r.error ? (
-                <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--red)]" />
-              ) : (
-                <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--emerald)]" />
-              )}
+              {r.error
+                ? <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--red)]" />
+                : <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--emerald)]" />
+              }
               <div className="min-w-0">
                 <p className="font-medium text-[var(--text)] truncate">{r.filename}</p>
-                {r.error ? (
-                  <p className="text-[var(--red)]">{r.error}</p>
-                ) : (
-                  <p className="text-[var(--text-dim)]">
-                    {r.isMonthlyTotal ? "📊 Итог за месяц · " : "📅 Неделя · "}
-                    {r.upserted} кампаний
-                  </p>
-                )}
+                {r.error
+                  ? <p className="text-[var(--red)]">{r.error}</p>
+                  : <p className="text-[var(--text-dim)]">{r.isMonthlyTotal ? "📊 Итог за месяц · " : "📅 Неделя · "}{r.upserted} кампаний</p>
+                }
               </div>
             </div>
           ))}
@@ -247,6 +319,9 @@ export function UploadCampaignsClient({ storeId }: { storeId: string }) {
           )}
         </div>
       )}
+
+      {/* Delete zone */}
+      <DeleteSection storeId={storeId} />
     </div>
   );
 }

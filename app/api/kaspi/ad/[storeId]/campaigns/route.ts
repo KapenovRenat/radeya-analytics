@@ -3,18 +3,19 @@
  *
  * Returns all campaigns for the store with their weekly stats.
  * Query params:
- *   from? — ISO date string (filter weekStart >= from)
- *   to?   — ISO date string (filter weekEnd <= to)
+ *   weeks[]? — ISO weekStart strings (multi-select filter)
+ *   from?    — ISO date (fallback range filter, weekStart >=)
+ *   to?      — ISO date (fallback range filter, weekStart <=)
  *
  * Response:
  * {
  *   campaigns: CampaignWithStats[],
- *   periods: Period[]   // all unique week periods sorted asc
+ *   periods: Period[]
  * }
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and, gte, lte, asc } from "drizzle-orm";
+import { eq, and, gte, lte, asc, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { adCampaigns, adWeeklyStats, adProducts } from "@/lib/db/schema";
 
@@ -26,17 +27,22 @@ export async function GET(
 ) {
   const { storeId } = await params;
   const { searchParams } = new URL(req.url);
+  const weeksParam = searchParams.getAll("weeks");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 
   const db = getDb();
 
-  // Build date filter for weekly stats.
-  // We filter by weekStart only — more robust than filtering weekEnd
-  // (avoids edge cases with T00:00:00Z vs T23:59:59Z stored weekEnds).
-  const dateFilters = [];
-  if (from) dateFilters.push(gte(adWeeklyStats.weekStart, new Date(from)));
-  if (to) dateFilters.push(lte(adWeeklyStats.weekStart, new Date(to)));
+  // Build date filter for weekly stats
+  const dateFilters: ReturnType<typeof eq>[] = [];
+  if (weeksParam.length > 0) {
+    // Explicit week selection (from WeekSelector)
+    dateFilters.push(inArray(adWeeklyStats.weekStart, weeksParam.map((w) => new Date(w))) as never);
+  } else {
+    // Fallback to date range
+    if (from) dateFilters.push(gte(adWeeklyStats.weekStart, new Date(from)) as never);
+    if (to) dateFilters.push(lte(adWeeklyStats.weekStart, new Date(to)) as never);
+  }
 
   // Fetch all campaigns for store
   const campaigns = await db
@@ -98,6 +104,7 @@ export async function GET(
       weekStart: s.weekStart,
       weekEnd: s.weekEnd,
       isMonthlyTotal: s.isMonthlyTotal,
+      impressions: s.impressions,
       spent: s.spent,
       dailyBudget: s.dailyBudget,
       targetClick: s.targetClick,

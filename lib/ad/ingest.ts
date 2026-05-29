@@ -81,6 +81,7 @@ export async function ingestCampaigns(
         weekStart,
         weekEnd,
         isMonthlyTotal,
+        impressions: row.impressions,
         spent: row.spent,
         dailyBudget: 0, // filled manually by user
         avgClick: row.avgClick,
@@ -95,6 +96,7 @@ export async function ingestCampaigns(
       .onConflictDoUpdate({
         target: [adWeeklyStats.campaignId, adWeeklyStats.weekStart, adWeeklyStats.isMonthlyTotal],
         set: {
+          impressions: row.impressions,
           spent: row.spent,
           avgClick: row.avgClick,
           orders: row.orders,
@@ -169,9 +171,11 @@ export async function ingestProducts(
         storeId,
         weekStart,
         weekEnd,
+        impressions: row.impressions,
         spent: row.spent,
         avgClick: row.avgClick,
         orders: row.orders,
+        revenue: row.revenue,
         drrPct: row.drrPct ?? 0,
         ctrPct: row.ctrPct,
         convCartPct: row.convCartPct,
@@ -181,9 +185,11 @@ export async function ingestProducts(
       .onConflictDoUpdate({
         target: [adProductStats.productId, adProductStats.weekStart],
         set: {
+          impressions: row.impressions,
           spent: row.spent,
           avgClick: row.avgClick,
           orders: row.orders,
+          revenue: row.revenue,
           drrPct: row.drrPct ?? 0,
           ctrPct: row.ctrPct,
           convCartPct: row.convCartPct,
