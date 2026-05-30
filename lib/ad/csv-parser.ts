@@ -135,7 +135,7 @@ export function parseCampaignsCsv(content: string): ParsedCampaignRow[] {
     const name = cols[0];
     if (!name) continue;
 
-    const statusRaw = cols[1].toLowerCase().trim();
+    const statusRaw = cols[1].toLowerCase().trim().replace(/ё/g, "е");
     const status: "on" | "off" | "deleted" =
       statusRaw === "активная" ? "on"
       : statusRaw.startsWith("удален") ? "deleted"
