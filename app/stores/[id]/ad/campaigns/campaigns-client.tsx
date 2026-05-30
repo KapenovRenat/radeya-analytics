@@ -37,7 +37,7 @@ interface WeekStat {
 interface Campaign {
   id: string;
   name: string;
-  status: string;        // "on" | "off"
+  status: string;        // "on" | "off" | "deleted"
   improveCard: string;   // "yes" | "no" | "maybe"
   hasReviews: boolean;
   hasDiscount: boolean;
@@ -375,6 +375,8 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("");
+  const [showDisabled, setShowDisabled] = useState(true);
+  const [showDeleted, setShowDeleted] = useState(true);
   const [compareOpen, setCompareOpen] = useState(false);
   const [productsCampaign, setProductsCampaign] = useState<{ id: string; name: string } | null>(null);
 
@@ -478,16 +480,22 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
   // Last weekly period for sort reference
   const lastWeek = weekPeriods[weekPeriods.length - 1];
 
-  // Client-side search + sort
+  // Client-side search + filter + sort
   const filtered = campaigns
     .filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((c) => showDisabled || c.status === "on")
+    .filter((c) => showDeleted || c.status !== "deleted")
     .sort((a, b) => {
+      // Primary: on → off → deleted
+      const statusOrder = (s: string) => s === "on" ? 0 : s === "off" ? 1 : 2;
+      const statusDiff = statusOrder(a.status) - statusOrder(b.status);
+      if (statusDiff !== 0) return statusDiff;
+      // Secondary: custom sort by metric
       if (!sortBy || !lastWeek) return 0;
       const getStat = (c: Campaign) =>
         c.weeks.find((w) => w.weekStart === lastWeek.weekStart && !w.isMonthlyTotal);
       const aVal = (getStat(a)?.[sortBy] as number) ?? -Infinity;
       const bVal = (getStat(b)?.[sortBy] as number) ?? -Infinity;
-      // DRR: ascending (lower is better); rest: descending
       return sortBy === "drrPct" ? aVal - bVal : bVal - aVal;
     });
 
@@ -561,6 +569,48 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
               Сравнить {weekPeriods.length} нед.
             </Button>
           )}
+
+          {/* Toggle disabled */}
+          <button
+            onClick={() => setShowDisabled((s) => !s)}
+            className={cn(
+              "inline-flex h-7 items-center gap-1.5 rounded-[var(--radius)] border px-2.5 text-[11px] font-medium transition-colors",
+              showDisabled
+                ? "border-[var(--border)] bg-[var(--surface-elev)] text-[var(--text-dim)] hover:border-[var(--border-strong)]"
+                : "border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)]",
+            )}
+          >
+            <span className={cn(
+              "inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors",
+              showDisabled ? "border-[var(--border-strong)]" : "bg-[var(--accent)] border-[var(--accent)]",
+            )}>
+              {!showDisabled && <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5.5L4 7.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>}
+            </span>
+            Выключенные
+          </button>
+
+          {/* Toggle deleted */}
+          <button
+            onClick={() => setShowDeleted((s) => !s)}
+            className={cn(
+              "inline-flex h-7 items-center gap-1.5 rounded-[var(--radius)] border px-2.5 text-[11px] font-medium transition-colors",
+              showDeleted
+                ? "border-[var(--border)] bg-[var(--surface-elev)] text-[var(--text-dim)] hover:border-[var(--border-strong)]"
+                : "border-[var(--red)]/40 bg-[var(--red)]/10 text-[var(--red)]",
+            )}
+          >
+            <span className={cn(
+              "inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors",
+              showDeleted ? "border-[var(--border-strong)]" : "bg-[var(--red)] border-[var(--red)]",
+            )}>
+              {!showDeleted && <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5.5L4 7.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>}
+            </span>
+            Удалённые
+          </button>
 
           {/* Refresh */}
           <Button variant="ghost" size="sm" onClick={load} disabled={loading}>
@@ -675,8 +725,12 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
 
                     {/* Status */}
                     <td className="px-3 py-2 text-center">
-                      <InlineDropdown value={c.status} options={STATUS_OPTIONS}
-                        onSave={(v) => patchCampaign(c.id, "status", v)} />
+                      {c.status === "deleted" ? (
+                        <span className="text-[11px] font-medium text-[var(--red)]">✕ Удалена</span>
+                      ) : (
+                        <InlineDropdown value={c.status} options={STATUS_OPTIONS}
+                          onSave={(v) => patchCampaign(c.id, "status", v)} />
+                      )}
                     </td>
 
                     {/* improveCard */}

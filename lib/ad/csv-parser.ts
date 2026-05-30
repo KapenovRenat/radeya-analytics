@@ -13,7 +13,7 @@
 
 export interface ParsedCampaignRow {
   name: string;
-  status: "on" | "off";
+  status: "on" | "off" | "deleted";
   impressions: number;
   clicks: number;
   ctrPct: number;
@@ -135,8 +135,11 @@ export function parseCampaignsCsv(content: string): ParsedCampaignRow[] {
     const name = cols[0];
     if (!name) continue;
 
-    const statusRaw = cols[1].toLowerCase();
-    const status: "on" | "off" = statusRaw === "активная" ? "on" : "off";
+    const statusRaw = cols[1].toLowerCase().trim();
+    const status: "on" | "off" | "deleted" =
+      statusRaw === "активная" ? "on"
+      : statusRaw.startsWith("удален") ? "deleted"
+      : "off";
 
     const impressions = parseNum(cols[2]);
     const clicks = parseNum(cols[3]);
