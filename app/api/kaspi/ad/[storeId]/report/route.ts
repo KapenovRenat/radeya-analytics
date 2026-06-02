@@ -57,7 +57,7 @@ function buildMessage(data: {
   const ratingIcon = (r: string | null) =>
     r === "good" ? "🟢" : r === "normal" ? "🟡" : r === "bad" ? "🔴" : "⚪️";
 
-  let msg = `📊 <b>Отчёт ${storeName}</b>\n\n`;
+  let msg = `📊 <b>Отчёт ${storeName} - Каспи Маркетинг</b>\n\n`;
 
   // ── Обзор недели ──
   msg += `📈 <b>ОБЗОР НЕДЕЛИ</b>\n`;
