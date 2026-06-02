@@ -362,16 +362,26 @@ export const adStoreOverview = pgTable(
 export type AdStoreOverview = typeof adStoreOverview.$inferSelect;
 
 /**
- * Per-store Telegram report config: bot token + recipient chat IDs.
+ * Telegram report recipients — stored per store.
  */
-export const adReportConfig = pgTable("ad_report_config", {
-  storeId: uuid("store_id")
-    .primaryKey()
-    .references(() => kaspiStores.id, { onDelete: "cascade" }),
-  botToken: text("bot_token").notNull().default(""),
-  recipients: text("recipients").notNull().default(""), // comma-separated chat IDs
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const tgRecipients = pgTable(
+  "tg_recipients",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    chatId: text("chat_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_tg_recipients_store_chat").on(t.storeId, t.chatId),
+    index("tg_recipients_store_idx").on(t.storeId),
+  ],
+);
+
+export type TgRecipient = typeof tgRecipients.$inferSelect;
 
 export type AdCampaign = typeof adCampaigns.$inferSelect;
 export type NewAdCampaign = typeof adCampaigns.$inferInsert;

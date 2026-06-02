@@ -84,6 +84,7 @@ export async function SidebarServer() {
         { href: p("/ad/overview"), label: "Обзор", iconName: "LineChart" },
         { href: p("/ad/campaigns"), label: "По кампаниям", iconName: "Megaphone" },
         { href: p("/ad/upload"), label: "Загрузка CSV", iconName: "Upload" },
+        { href: p("/ad/report"), label: "Отчёт в Telegram", iconName: "Send" },
       ],
     },
     {
