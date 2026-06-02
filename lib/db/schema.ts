@@ -327,7 +327,51 @@ export const adPeriods = pgTable(
   ],
 );
 
+/**
+ * Store-level daily overview from «Обзорный отчёт» Kaspi CSV.
+ * One row per day. Powers the /ad/overview weekly comparison page.
+ */
+export const adStoreOverview = pgTable(
+  "ad_store_overview",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    date: timestamp("date", { withTimezone: true }).notNull(),
+    impressions: integer("impressions").default(0),
+    clicks: integer("clicks").default(0),
+    ctrPct: doublePrecision("ctr_pct").default(0),
+    avgClick: doublePrecision("avg_click").default(0),
+    spent: doublePrecision("spent").default(0),
+    revenue: doublePrecision("revenue").default(0),
+    orders: integer("orders").default(0),
+    favorites: integer("favorites").default(0),
+    cart: integer("cart").default(0),
+    drrPct: doublePrecision("drr_pct").default(0),
+  },
+  (t) => [
+    uniqueIndex("uq_ad_store_overview_date").on(t.storeId, t.date),
+    index("ad_store_overview_store_idx").on(t.storeId),
+    index("ad_store_overview_date_idx").on(t.date),
+  ],
+);
+
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+export type AdStoreOverview = typeof adStoreOverview.$inferSelect;
+
+/**
+ * Per-store Telegram report config: bot token + recipient chat IDs.
+ */
+export const adReportConfig = pgTable("ad_report_config", {
+  storeId: uuid("store_id")
+    .primaryKey()
+    .references(() => kaspiStores.id, { onDelete: "cascade" }),
+  botToken: text("bot_token").notNull().default(""),
+  recipients: text("recipients").notNull().default(""), // comma-separated chat IDs
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export type AdCampaign = typeof adCampaigns.$inferSelect;
 export type NewAdCampaign = typeof adCampaigns.$inferInsert;

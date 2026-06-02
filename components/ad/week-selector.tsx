@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Check, Trash2, Loader2, Plus, Calendar, Search, X } from "lucide-react";
+import { ChevronDown, Check, Trash2, Loader2, Plus, Calendar, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -136,8 +136,7 @@ export function WeekSelector({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Per-group expanded state (groups with days start expanded)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  // (No expand/collapse — days are always aggregated into their week group)
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -169,11 +168,6 @@ export function WeekSelector({
       })
     : allGroups;
 
-  // Auto-expand groups that have days on first render
-  useEffect(() => {
-    setExpandedGroups(new Set(groups.filter((g) => g.days.length > 0).map((g) => g.weekStart)));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weeks.length]);
 
   useEffect(() => {
     if (!open) {
@@ -231,13 +225,6 @@ export function WeekSelector({
     }
   };
 
-  const toggleDay = (dayStart: string) => {
-    if (selectedSet.has(dayStart)) {
-      onChange(selected.filter((s) => s !== dayStart));
-    } else {
-      onChange([...selected, dayStart]);
-    }
-  };
 
   // All selectable weekStarts (days inside day-groups + week weekStarts)
   const allSelectableStarts: string[] = groups.flatMap((g) =>
@@ -314,11 +301,6 @@ export function WeekSelector({
     : selectedGroupCount === 1
     ? (() => {
         const g = groups.find((g) => groupSelectionState(g) !== "none")!;
-        if (g.days.length > 0) {
-          const selDays = g.days.filter((d) => selectedSet.has(d.weekStart));
-          if (selDays.length === 1) return fmtWeekLabel(selDays[0].weekStart, selDays[0].weekEnd, "day");
-          return `${selDays.length} дн. · ${fmtWeekLabel(g.weekStart, g.weekEnd)}`;
-        }
         return fmtWeekLabel(g.weekStart, g.weekEnd);
       })()
     : `${selectedGroupCount} из ${totalGroups} недель`;
@@ -397,34 +379,13 @@ export function WeekSelector({
             {groups.map((g) => {
               const state   = groupSelectionState(g);
               const hasDays = g.days.length > 0;
-              const expanded = expandedGroups.has(g.weekStart);
               const isConfirming = confirmWeek === g.weekStart;
 
               return (
                 <div key={g.weekStart}>
-                  {/* ── Week/group header row ── */}
-                  <div className={cn(
-                    "group flex items-center gap-1.5 px-3 py-1.5 hover:bg-white/[0.06]",
-                    hasDays && "border-b border-[var(--border)]/30",
-                  )}>
-                    {/* Expand/collapse chevron */}
-                    {hasDays ? (
-                      <button
-                        onClick={() => setExpandedGroups((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(g.weekStart)) next.delete(g.weekStart);
-                          else next.add(g.weekStart);
-                          return next;
-                        })}
-                        className="shrink-0 text-[var(--text-subtle)] hover:text-[var(--text)]"
-                      >
-                        {expanded
-                          ? <ChevronDown className="h-3 w-3" />
-                          : <ChevronRight className="h-3 w-3" />}
-                      </button>
-                    ) : (
-                      <span className="w-3 shrink-0" />
-                    )}
+                  {/* ── Week row ── */}
+                  <div className="group flex items-center gap-1.5 px-3 py-1.5 hover:bg-white/[0.06]">
+                    <span className="w-3 shrink-0" />
 
                     {/* Group checkbox + label */}
                     <button
@@ -453,7 +414,7 @@ export function WeekSelector({
                     </button>
 
                     {/* Delete */}
-                    {onDelete && !hasDays && (
+                    {onDelete && (
                       isConfirming ? (
                         <div className="flex shrink-0 items-center gap-1">
                           <span className="text-[10px] text-[var(--red)]">Удалить?</span>
@@ -478,54 +439,6 @@ export function WeekSelector({
                     )}
                   </div>
 
-                  {/* ── Day children ── */}
-                  {hasDays && expanded && g.days.map((d) => {
-                    const daySelected  = selectedSet.has(d.weekStart);
-                    const isDayConfirm = confirmWeek === d.weekStart;
-
-                    return (
-                      <div key={d.weekStart} className="group flex items-center gap-1.5 py-1 pl-9 pr-3 hover:bg-white/[0.04]">
-                        <button
-                          onClick={() => { if (!isDayConfirm) toggleDay(d.weekStart); }}
-                          className="flex flex-1 min-w-0 items-center gap-2 text-[11px]"
-                        >
-                          <span className={cn(
-                            "inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border",
-                            daySelected ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-strong)]",
-                          )}>
-                            {daySelected && <Check className="h-2.5 w-2.5 text-white" />}
-                          </span>
-                          <span className={cn("truncate", daySelected ? "text-[var(--text)]" : "text-[var(--text-dim)]")}>
-                            {fmtWeekLabel(d.weekStart, d.weekEnd, "day")}
-                          </span>
-                        </button>
-
-                        {onDelete && (
-                          isDayConfirm ? (
-                            <div className="flex shrink-0 items-center gap-1">
-                              <span className="text-[10px] text-[var(--red)]">Удалить?</span>
-                              <button onClick={() => handleDelete(d.weekStart)} disabled={deleting}
-                                className="rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--red)] hover:bg-[var(--red-soft)]">
-                                {deleting ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : "Да"}
-                              </button>
-                              <button onClick={() => setConfirmWeek(null)} disabled={deleting}
-                                className="rounded px-1.5 py-0.5 text-[10px] text-[var(--text-dim)] hover:bg-white/[0.06]">
-                                Нет
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setConfirmWeek(d.weekStart); }}
-                              className="shrink-0 rounded p-0.5 text-[var(--text-subtle)] opacity-0 transition-opacity hover:text-[var(--red)] group-hover:opacity-100"
-                              title="Удалить день"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )
-                        )}
-                      </div>
-                    );
-                  })}
                 </div>
               );
             })}

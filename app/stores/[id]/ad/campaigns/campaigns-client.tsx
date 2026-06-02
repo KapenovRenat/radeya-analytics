@@ -67,7 +67,7 @@ function fmtPct(n: number | null | undefined) {
 }
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "numeric", month: "short", timeZone: "UTC",
+    day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
   });
 }
 
@@ -212,64 +212,94 @@ const COMPARE_METRICS: CompareMetric[] = [
 function CompareModal({
   campaigns,
   periods,
+  title,
   onClose,
 }: {
   campaigns: Campaign[];
   periods: Period[];
+  title?: string;
   onClose: () => void;
 }) {
-  // Aggregate totals per week across all campaigns
   const weekPeriods = periods.filter((p) => !p.isMonthlyTotal);
 
-  const totals: WeekTotal[] = weekPeriods.map((p) => {
-    let spent = 0, impressions = 0, orders = 0, drrSum = 0, ctrSum = 0, convCartSum = 0, convFavSum = 0, avgClickSum = 0, count = 0;
-    for (const c of campaigns) {
-      const s = c.weeks.find((w) => w.weekStart === p.weekStart && !w.isMonthlyTotal);
-      if (s) {
-        spent += s.spent ?? 0;
-        impressions += s.impressions ?? 0;
-        orders += s.orders ?? 0;
-        drrSum += s.drrPct ?? 0;
-        ctrSum += s.ctrPct ?? 0;
-        convCartSum += s.convCartPct ?? 0;
-        convFavSum += s.convFavPct ?? 0;
-        avgClickSum += s.avgClick ?? 0;
-        count++;
+  // Group by calendar week and aggregate
+  const getMon = (iso: string) => {
+    const d = new Date(iso);
+    const dow = d.getUTCDay();
+    d.setUTCDate(d.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
+    return d.toISOString().slice(0, 10) + "T00:00:00.000Z";
+  };
+  const getSun = (mon: string) => {
+    const d = new Date(mon);
+    d.setUTCDate(d.getUTCDate() + 6);
+    return d.toISOString().slice(0, 10) + "T00:00:00.000Z";
+  };
+
+  const weekGroups = (() => {
+    const map = new Map<string, { weekStart: string; weekEnd: string; keys: string[] }>();
+    for (const p of weekPeriods) {
+      const mon = p.granularity === "week" ? p.weekStart : getMon(p.weekStart);
+      if (!map.has(mon)) {
+        const we = weekPeriods.find((x) => x.granularity === "week" && getMon(x.weekStart) === mon);
+        map.set(mon, { weekStart: we ? we.weekStart : mon, weekEnd: we ? we.weekEnd : getSun(mon), keys: [] });
+      }
+      map.get(mon)!.keys.push(p.weekStart);
+    }
+    return Array.from(map.values()).sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+  })();
+
+  const totals: WeekTotal[] = weekGroups.map(({ weekStart, weekEnd, keys }) => {
+    let spent = 0, impressions = 0, orders = 0, revenue = 0;
+    let ctrClicks = 0, ccc = 0, ccCart = 0, cfClicks = 0, cfFav = 0, avgSum = 0, avgN = 0;
+    for (const key of keys) {
+      for (const c of campaigns) {
+        const s = c.weeks.find((w) => w.weekStart === key && !w.isMonthlyTotal);
+        if (s) {
+          spent += s.spent ?? 0; impressions += s.impressions ?? 0;
+          orders += s.orders ?? 0; revenue += s.revenue ?? 0;
+          const clicks = s.impressions && s.ctrPct ? (s.ctrPct / 100) * s.impressions : 0;
+          ctrClicks += clicks;
+          ccCart += clicks * (s.convCartPct ?? 0) / 100; ccc += clicks;
+          cfFav  += clicks * (s.convFavPct  ?? 0) / 100; cfClicks += clicks;
+          if (s.avgClick) { avgSum += s.avgClick; avgN++; }
+        }
       }
     }
-    const avg = (v: number) => (count > 0 ? v / count : 0);
     return {
-      weekStart: p.weekStart,
-      weekEnd: p.weekEnd,
-      spent,
-      impressions,
-      orders,
-      drrPct: avg(drrSum),
-      ctrPct: avg(ctrSum),
-      convCartPct: avg(convCartSum),
-      convFavPct: avg(convFavSum),
-      avgClick: avg(avgClickSum),
+      weekStart, weekEnd,
+      spent, impressions, orders,
+      drrPct:      revenue > 0     ? (spent / revenue) * 100        : 0,
+      ctrPct:      impressions > 0 ? (ctrClicks / impressions) * 100 : 0,
+      convCartPct: ccc > 0         ? (ccCart / ccc) * 100            : 0,
+      convFavPct:  cfClicks > 0    ? (cfFav  / cfClicks) * 100       : 0,
+      avgClick:    avgN > 0        ? avgSum / avgN                    : 0,
     };
   });
 
-  const delta = (metric: keyof typeof totals[0], first: number, last: number) => {
-    const diff = last - first;
+  const delta = (metric: keyof WeekTotal, values: number[]) => {
+    const first = values[0] ?? 0;
+    const last  = values[values.length - 1] ?? 0;
+    const diff  = last - first;
     if (diff === 0) return null;
-    return { diff, pct: first !== 0 ? (diff / first) * 100 : 0 };
+    // Use first non-zero value as the percentage base
+    const base = values.find((v) => v !== 0) ?? 0;
+    return { diff, pct: base !== 0 ? ((last - base) / base) * 100 : null };
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="relative max-h-[85vh] w-full max-w-[900px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl"
+        className="relative max-h-[85vh] w-full max-w-[960px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="mb-5 flex items-start justify-between">
-          <div>
-            <h2 className="text-[15px] font-semibold text-[var(--text)]">Сравнение недель</h2>
+          <div className="min-w-0">
+            <h2 className="truncate text-[15px] font-semibold text-[var(--text)]">
+              {title ?? "Сравнение периодов"}
+            </h2>
             <p className="mt-0.5 text-[12px] text-[var(--text-dim)]">
-              Суммарные показатели по {campaigns.length} кампаниям
+              {title ? `Кампания · ${totals.length} нед.` : `По ${campaigns.length} кампаниям · ${totals.length} нед.`}
             </p>
           </div>
           <button onClick={onClose} className="rounded p-1.5 text-[var(--text-dim)] hover:bg-white/10">
@@ -285,14 +315,14 @@ function CompareModal({
                 <th className="py-2 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)] min-w-[120px]">
                   Метрика
                 </th>
-                {weekPeriods.map((p) => (
-                  <th key={p.weekStart} className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-dim)] whitespace-nowrap">
-                    {fmtDate(p.weekStart)} — {fmtDate(p.weekEnd)}
+                {totals.map((t) => (
+                  <th key={t.weekStart} className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-dim)] whitespace-nowrap">
+                    {fmtWeekLabel(t.weekStart, t.weekEnd)}
                   </th>
                 ))}
-                {weekPeriods.length >= 2 && (
+                {totals.length >= 2 && (
                   <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--accent)] whitespace-nowrap">
-                    Δ нед 1→{weekPeriods.length}
+                    Δ нед. 1→{totals.length}
                   </th>
                 )}
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-dim)]">
@@ -303,12 +333,9 @@ function CompareModal({
             <tbody>
               {COMPARE_METRICS.map((metric) => {
                 const values = totals.map((t) => (t[metric.key] as number) ?? 0);
-                const first = values[0] ?? 0;
-                const last = values[values.length - 1] ?? 0;
-                const d = weekPeriods.length >= 2 ? delta(metric.key, first, last) : null;
+                const d = totals.length >= 2 ? delta(metric.key, values) : null;
                 const isPositive = d && (metric.higherIsBetter ? d.diff > 0 : d.diff < 0);
                 const isNegative = d && (metric.higherIsBetter ? d.diff < 0 : d.diff > 0);
-
                 const sparkData = values.map((v, i) => ({ i, v }));
 
                 return (
@@ -319,11 +346,11 @@ function CompareModal({
                         {metric.fmt(v)}
                       </td>
                     ))}
-                    {weekPeriods.length >= 2 && (
+                    {totals.length >= 2 && (
                       <td className={cn("px-3 py-2 text-right tabular-nums font-medium whitespace-nowrap",
                         isPositive ? "text-[var(--emerald)]" : isNegative ? "text-[var(--red)]" : "text-[var(--text-dim)]")}>
                         {d
-                          ? `${d.diff > 0 ? "+" : ""}${metric.fmt(d.diff)} (${d.pct > 0 ? "+" : ""}${d.pct.toFixed(1)}%)`
+                          ? `${d.diff > 0 ? "+" : ""}${metric.fmt(d.diff)}${d.pct != null ? ` (${d.pct > 0 ? "+" : ""}${d.pct.toFixed(1)}%)` : ""}`
                           : "—"}
                       </td>
                     )}
@@ -378,6 +405,7 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
   const [showDisabled, setShowDisabled] = useState(true);
   const [showDeleted, setShowDeleted] = useState(true);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [compareCampaign, setCompareCampaign] = useState<Campaign | null>(null);
   const [productsCampaign, setProductsCampaign] = useState<{ id: string; name: string } | null>(null);
 
   // Load available weeks (extracted to useCallback so handleDeleteWeek can call it)
@@ -480,6 +508,17 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
   // Last weekly period for sort reference
   const lastWeek = weekPeriods[weekPeriods.length - 1];
 
+  // Count distinct calendar weeks in selected periods (days in same Mon–Sun = 1 week)
+  const getMondayKey = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const dow = d.getUTCDay();
+    d.setUTCDate(d.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
+    return d.toISOString().slice(0, 10);
+  };
+  const compareGroupCount = new Set(
+    weekPeriods.map((p) => p.granularity === "week" ? p.weekStart : getMondayKey(p.weekStart))
+  ).size;
+
   // Client-side search + filter + sort
   const filtered = campaigns
     .filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()))
@@ -563,10 +602,10 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
           </div>
 
           {/* Compare button */}
-          {weekPeriods.length >= 2 && (
+          {compareGroupCount >= 2 && (
             <Button variant="ghost" size="sm" onClick={() => setCompareOpen(true)}>
               <GitCompareArrows className="h-3.5 w-3.5" />
-              Сравнить {weekPeriods.length} нед.
+              Сравнить {compareGroupCount} нед.
             </Button>
           )}
 
@@ -714,13 +753,24 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
                     {/* Name */}
                     <td className="sticky left-0 z-10 bg-[var(--bg)] px-4 py-2 font-medium text-[var(--text)] min-w-[220px] max-w-[280px]">
                       <span className="block truncate" title={c.name}>{c.name}</span>
-                      <button
-                        onClick={() => setProductsCampaign({ id: c.id, name: c.name })}
-                        className="mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-dim)] hover:bg-white/10 hover:text-[var(--text)] transition-colors"
-                      >
-                        <Package className="h-3 w-3" />
-                        Товары
-                      </button>
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <button
+                          onClick={() => setProductsCampaign({ id: c.id, name: c.name })}
+                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-dim)] hover:bg-white/10 hover:text-[var(--text)] transition-colors"
+                        >
+                          <Package className="h-3 w-3" />
+                          Товары
+                        </button>
+                        {compareGroupCount >= 2 && (
+                          <button
+                            onClick={() => { setCompareCampaign(c); setCompareOpen(true); }}
+                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-dim)] hover:bg-white/10 hover:text-[var(--accent)] transition-colors"
+                          >
+                            <GitCompareArrows className="h-3 w-3" />
+                            Сравнить
+                          </button>
+                        )}
+                      </div>
                     </td>
 
                     {/* Status */}
@@ -856,9 +906,10 @@ export function CampaignsClient({ storeId }: { storeId: string }) {
       {/* Comparison modal */}
       {compareOpen && (
         <CompareModal
-          campaigns={filtered}
+          campaigns={compareCampaign ? [compareCampaign] : filtered}
           periods={periods}
-          onClose={() => setCompareOpen(false)}
+          title={compareCampaign?.name}
+          onClose={() => { setCompareOpen(false); setCompareCampaign(null); }}
         />
       )}
 

@@ -237,3 +237,45 @@ export function parseProductsCsv(content: string): ParsedProductRow[] {
 
   return rows;
 }
+
+// ─── Overview CSV ─────────────────────────────────────────────────────────────
+
+export interface ParsedOverviewRow {
+  date: Date;
+  impressions: number;
+  clicks: number;
+  ctrPct: number;
+  avgClick: number;
+  spent: number;
+  revenue: number;
+  orders: number;
+  favorites: number;
+  cart: number;
+  drrPct: number;
+}
+
+export function parseOverviewCsv(content: string): ParsedOverviewRow[] {
+  const lines = stripBom(content).split(/\r?\n/).filter((l) => l.trim() !== "");
+  const rows: ParsedOverviewRow[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = splitLine(lines[i]);
+    if (cols.length < 11) continue;
+    const dateStr = cols[0].trim();
+    const date = new Date(dateStr + "T00:00:00.000Z");
+    if (isNaN(date.getTime())) continue;
+    rows.push({
+      date,
+      impressions: parseNum(cols[1]),
+      clicks:      parseNum(cols[2]),
+      ctrPct:      parseNum(cols[3]),
+      avgClick:    parseNum(cols[4]),
+      spent:       parseNum(cols[5]),
+      revenue:     parseNum(cols[6]),
+      orders:      parseNum(cols[7]),
+      favorites:   parseNum(cols[8]),
+      cart:        parseNum(cols[9]),
+      drrPct:      parseNum(cols[10]),
+    });
+  }
+  return rows;
+}

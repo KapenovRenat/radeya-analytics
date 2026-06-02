@@ -72,7 +72,7 @@ function fmtPct(n: number | null | undefined) {
 }
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "numeric", month: "short", timeZone: "UTC",
+    day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
   });
 }
 
