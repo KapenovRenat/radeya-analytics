@@ -54,6 +54,7 @@ Kaspi API
 - `/stores/[id]/dashboard` — сводный дашборд
 - `/stores/[id]/revenue` — выручка
 - `/stores/[id]/orders` — заказы
+- `/stores/[id]/cancellations` — отмены в пути (товары, отменённые после выдачи в отгрузку) → [[cancellations-in-transit]]
 - `/stores/[id]/customers` — клиенты
 - `/stores/[id]/delivery` — доставка
 - `/stores/[id]/credit` — кредит

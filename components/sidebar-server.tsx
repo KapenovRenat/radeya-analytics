@@ -50,7 +50,7 @@ export async function SidebarServer() {
       defaultOpen: true,
       items: [
         { href: p("/orders"), label: "Заказы", iconName: "ShoppingBag" },
-        { href: "/cancellations", label: "Отмены и возвраты", iconName: "XCircle" },
+        { href: p("/cancellations"), label: "Отмены и возвраты", iconName: "XCircle" },
         { href: p("/delivery"), label: "Доставка", iconName: "Truck" },
       ],
     },

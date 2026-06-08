@@ -159,6 +159,93 @@ export async function returnRateByPeriod({ storeId, from, to }: Range, period: P
   return rows;
 }
 
+/* ────────────────────────────────────────────────────────────────
+   ОТМЕНЫ В ПУТИ (cancelled-in-transit)
+   Товары, отменённые КЛИЕНТОМ уже после выдачи в отгрузку.
+
+   Признаки (подтверждены данными Radeya):
+   - status = 'CANCELLED'
+   - assembled = true                        → заказ собран и выдан в отгрузку
+   - cancellation_reason IN (BUYER_*)        → инициатор отмены — клиент
+       BUYER_CANCELLATION_BY_COURIER  — отказ курьеру (заведомо «в пути»)
+       BUYER_CANCELLATION_HIMSELF     — клиент отменил сам после сборки
+
+   Сумма и количество берутся на уровне позиций (kaspi_order_entries),
+   чтобы видеть конкретные товары (SKU), а не только заказы.
+   ──────────────────────────────────────────────────────────────── */
+
+const CANCELLED_IN_TRANSIT_WHERE = sql`
+  o.status = 'CANCELLED'
+  AND o.assembled = true
+  AND o.cancellation_reason IN ('BUYER_CANCELLATION_HIMSELF', 'BUYER_CANCELLATION_BY_COURIER')
+`;
+
+/** Итоги «отмен в пути»: заказов, единиц товара, сумма. */
+export async function cancelledInTransitSummary({ storeId, from, to }: Range) {
+  const { rows } = await getDb().execute<{ orders: number; quantity: number; amount: number }>(sql`
+    SELECT
+      COUNT(DISTINCT o.id)::int AS orders,
+      COALESCE(SUM(e.quantity), 0)::int AS quantity,
+      COALESCE(SUM(e.total_price), 0)::float AS amount
+    FROM kaspi_orders o
+    JOIN kaspi_order_entries e ON e.order_id = o.id
+    WHERE o.store_id = ${storeId}
+      AND o.creation_date >= ${from.toISOString()}
+      AND o.creation_date <= ${to.toISOString()}
+      AND ${CANCELLED_IN_TRANSIT_WHERE}
+  `);
+  return rows[0] ?? { orders: 0, quantity: 0, amount: 0 };
+}
+
+/** Товары (SKU), отменённые в пути: количество, сумма, число заказов. */
+export async function cancelledInTransitProducts({ storeId, from, to }: Range) {
+  const { rows } = await getDb().execute<{
+    offer_code: string | null;
+    offer_name: string | null;
+    category: string | null;
+    quantity: number;
+    amount: number;
+    orders: number;
+  }>(sql`
+    SELECT
+      e.offer_code,
+      MAX(e.offer_name) AS offer_name,
+      MAX(e.category_title) AS category,
+      SUM(e.quantity)::int AS quantity,
+      SUM(e.total_price)::float AS amount,
+      COUNT(DISTINCT o.id)::int AS orders
+    FROM kaspi_orders o
+    JOIN kaspi_order_entries e ON e.order_id = o.id
+    WHERE o.store_id = ${storeId}
+      AND o.creation_date >= ${from.toISOString()}
+      AND o.creation_date <= ${to.toISOString()}
+      AND ${CANCELLED_IN_TRANSIT_WHERE}
+    GROUP BY e.offer_code
+    ORDER BY amount DESC
+  `);
+  return rows;
+}
+
+/** Разбивка «отмен в пути» по причине отмены клиента. */
+export async function cancelledInTransitByReason({ storeId, from, to }: Range) {
+  const { rows } = await getDb().execute<{ reason: string; orders: number; quantity: number; amount: number }>(sql`
+    SELECT
+      o.cancellation_reason AS reason,
+      COUNT(DISTINCT o.id)::int AS orders,
+      COALESCE(SUM(e.quantity), 0)::int AS quantity,
+      COALESCE(SUM(e.total_price), 0)::float AS amount
+    FROM kaspi_orders o
+    JOIN kaspi_order_entries e ON e.order_id = o.id
+    WHERE o.store_id = ${storeId}
+      AND o.creation_date >= ${from.toISOString()}
+      AND o.creation_date <= ${to.toISOString()}
+      AND ${CANCELLED_IN_TRANSIT_WHERE}
+    GROUP BY o.cancellation_reason
+    ORDER BY amount DESC
+  `);
+  return rows;
+}
+
 export async function ordersByDayOfWeek({ storeId, from, to }: Range) {
   const { rows } = await getDb().execute<{ dow: number; count: number; revenue: number }>(sql`
     SELECT

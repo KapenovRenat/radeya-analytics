@@ -50,6 +50,16 @@ export const STATUS_COLORS: Record<string, string> = {
   APPROVED_BY_BANK: "var(--blue)",
 };
 
+export const CANCELLATION_REASON_LABELS: Record<string, string> = {
+  BUYER_CANCELLATION_HIMSELF: "Клиент отменил сам",
+  BUYER_CANCELLATION_BY_COURIER: "Отказ курьеру",
+  MERCHANT_OUT_OF_STOCK: "Нет в наличии",
+  RFO_REJECTED: "Отклонён по RFO",
+  TIMEOUT_BUYER_SIGNATURE: "Таймаут подписи покупателя",
+  TIMEOUT_MERCHANT_DELIVERY: "Таймаут доставки продавца",
+  TECHNICAL_PROBLEM_CANCELLATION: "Техническая проблема",
+};
+
 export const DOW_LABELS_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 export const DOW_LABELS_FULL = [
   "Понедельник",

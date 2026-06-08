@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 2026-06-08 (фича «Отмены в пути»)
+
+- Внёс: Дамир (машина damir). Реализован раздел `/stores/[id]/cancellations` — товары, отменённые клиентом после выдачи в отгрузку («отмены в пути»), с суммой и количеством по каждому SKU
+- Определение «в пути» выведено из данных БД: `status='CANCELLED'` + `assembled=true` + `cancellation_reason IN (BUYER_CANCELLATION_HIMSELF, BUYER_CANCELLATION_BY_COURIER)`. Поле `state` непригодно — у всех отменённых `ARCHIVE`
+- Новые файлы: aggregates (`cancelledInTransitSummary/Products/ByReason`), `CANCELLATION_REASON_LABELS`, API `GET /api/kaspi/analytics/[storeId]/cancellations`, страница + view, пункт сайдбара переведён на store-scoped путь
+- Проверено на данных Radeya: 174 заказа, 175 ед., 41 075 629 ₸, 124 SKU. TypeScript 0 ошибок, API 200, страница рендерится
+- Создано wiki: [[cancellations-in-transit]]. Обновлено: [[backlog]] (задача → ✅), [[project]] (разделы UI), index.md
+
 ## 2026-06-08 (бэклог)
 
 - Внёс: Дамир (машина damir). Создано wiki: [[backlog]] — новый файл очереди задач (кто поставил / срок / статус)
