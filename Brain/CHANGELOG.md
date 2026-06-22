@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 2026-06-22
+
+- **VPS-развёртывание** на Ubuntu 24.04 (сервер Radeya, 194.238.42.140): swap, Node 24, PostgreSQL 16, создание БД/юзера, перенос дампа через scp, `.env.local`, drizzle push, сборка. PM2/Nginx — в процессе.
+- Создано wiki: [[deployment-vps]] — реальная последовательность шагов + грабли (PGPASSWORD в bash, --no-owner для дампа, -h localhost для restore, swap для build)
+- **`package.json`:** добавлен скрипт `deploy` (`git pull && npm install && drizzle push && build && pm2 restart`)
+- **`.gitignore`:** `backup.sql` убран из отслеживания (`git rm --cached`) — содержал зашифрованные токены
+- **`AGENTS.md` (корневой):** добавлено правило «сначала опиши → утверди → делай»; не выполнять команды/git без явного одобрения владельца
+- Обновлено index.md
+
 ## 2026-06-08
 
 - Создано wiki: [[deployment]] — пошаговая инструкция развёртывания на новом компьютере (пререквизиты, БД, .env.local, drizzle push через dotenv-cli, перенос JWT_SECRET_KEY и дампа БД, PM2, типичные ошибки)
