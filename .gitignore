@@ -51,3 +51,6 @@ MVP-DUMP-*.md
 SESSION-CONTEXT-*.md
 
 .env*.local
+
+# Database dumps (contain encrypted tokens — never commit)
+backup.sql

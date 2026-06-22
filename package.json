@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "deploy": "git pull && npm install && npx dotenv-cli -e .env.local -- npx drizzle-kit push && npm run build && pm2 restart radeya-analytics"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.2",
