@@ -23,6 +23,22 @@ interface Product {
   brand: string | null;
   supplier: string | null;
   imageUrl: string | null;
+  whAstana: number | null;
+  whPavlodar: number | null;
+  whKostanay: number | null;
+  whPetropavlovsk: number | null;
+  whAlmaty: number | null;
+}
+
+// Сроки складов товара → компактная строка «Город N · Город M» (только ненулевые)
+function whSummary(p: Product): { city: string; days: number }[] {
+  return [
+    { city: "Астана", days: p.whAstana ?? 0 },
+    { city: "Павлодар", days: p.whPavlodar ?? 0 },
+    { city: "Костанай", days: p.whKostanay ?? 0 },
+    { city: "Петропавловск", days: p.whPetropavlovsk ?? 0 },
+    { city: "Алматы", days: p.whAlmaty ?? 0 },
+  ].filter((w) => w.days > 0);
 }
 
 interface SupplierRow {
@@ -520,6 +536,7 @@ export function ProductsView({ storeId, storeName }: { storeId: string; storeNam
               <th className="px-3 py-2.5 text-left font-semibold">Код</th>
               <th className="px-3 py-2.5 text-left font-semibold">Наименование</th>
               <th className="px-3 py-2.5 text-left font-semibold">Поставщик</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Сроки складов</th>
               <th className="px-3 py-2.5 text-right font-semibold">Цена</th>
               <th className="px-3 py-2.5 text-center font-semibold">Штрихкод</th>
               <th className="px-3 py-2.5 text-center font-semibold">Kaspi</th>
@@ -527,10 +544,10 @@ export function ProductsView({ storeId, storeName }: { storeId: string; storeNam
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-[var(--text-dim)]"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></td></tr>
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-[var(--text-dim)]"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></td></tr>
             )}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">
                 {debounced ? "Ничего не найдено" : "Товаров нет — загрузи Excel из МойСклад"}
               </td></tr>
             )}
@@ -571,6 +588,20 @@ export function ProductsView({ storeId, storeName }: { storeId: string; storeNam
                 {/* Поставщик */}
                 <td className="px-3 py-2 text-[var(--text-dim)] max-w-[200px]">
                   <span className="line-clamp-2 text-[11px]">{p.supplier ?? "—"}</span>
+                </td>
+                {/* Сроки складов */}
+                <td className="px-3 py-2 text-[11px]">
+                  {whSummary(p).length === 0 ? (
+                    <span className="text-[var(--text-subtle)]">—</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {whSummary(p).map((w) => (
+                        <span key={w.city} className="inline-flex items-center gap-1 rounded bg-[var(--surface-elev)] px-1.5 py-0.5 whitespace-nowrap text-[var(--text)]">
+                          {w.city} <span className="font-semibold text-[var(--accent)]">{w.days}д</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 {/* Цена */}
                 <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums font-medium text-[var(--text)]">

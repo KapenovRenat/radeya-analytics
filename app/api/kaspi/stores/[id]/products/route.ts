@@ -47,6 +47,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       brand: products.brand,
       supplier: products.supplier,
       imageUrl: products.imageUrl,
+      whAstana: products.whAstana,
+      whPavlodar: products.whPavlodar,
+      whKostanay: products.whKostanay,
+      whPetropavlovsk: products.whPetropavlovsk,
+      whAlmaty: products.whAlmaty,
     })
     .from(products)
     .where(where)
