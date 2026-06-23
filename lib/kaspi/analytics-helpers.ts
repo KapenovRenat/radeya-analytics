@@ -19,11 +19,12 @@ export function parseRange(req: NextRequest, storeId: string): RangeQuery {
   const sp = req.nextUrl.searchParams;
   const now = new Date();
   const toParam = sp.get("to");
-  // Конец дня: "2026-06-21" → 21 июня 23:59:59.999 UTC, чтобы заказы
-  // последнего дня периода не выпадали из выборки.
-  const to = toParam ? new Date(toParam + "T23:59:59.999Z") : now;
+  // Границы дня в местном времени Казахстана (UTC+5), как в Kaspi-кабинете:
+  // "2026-06-21" → конец дня 21 июня по Алматы (= 18:59:59 UTC), а не по UTC.
+  // Иначе UTC-границы захватывают лишние 5 часов следующего дня → расхождение.
+  const to = toParam ? new Date(toParam + "T23:59:59.999+05:00") : now;
   const fromParam = sp.get("from");
-  const from = fromParam ? new Date(fromParam + "T00:00:00.000Z") : new Date(now.getTime() - 30 * 86_400_000);
+  const from = fromParam ? new Date(fromParam + "T00:00:00.000+05:00") : new Date(now.getTime() - 30 * 86_400_000);
   const periodParam = sp.get("g") as Period | null;
   const period: Period =
     periodParam && ["daily", "weekly", "monthly"].includes(periodParam)

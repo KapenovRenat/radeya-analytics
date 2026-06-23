@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   RefreshCw, CalendarClock, CalendarDays, AlertTriangle,
-  CheckCircle2, Loader2, Store as StoreIcon, History, Plus,
+  CheckCircle2, Loader2, Store as StoreIcon, History, Plus, Trash2,
 } from "lucide-react";
 import { useSync } from "@/lib/use-sync";
 import { useEntriesSync } from "@/lib/use-entries-sync";
@@ -70,11 +71,26 @@ function StatusBadge({ status }: { status: string | null }) {
 // ─── Per-store card ───────────────────────────────────────────────────────────
 
 function StoreSyncCard({ store }: { store: StoreRow }) {
+  const router = useRouter();
   const { status, running, startSync } = useSync(store.id);
   const { status: entriesStatus, running: entriesRunning, start: startEntries } = useEntriesSync(store.id);
   const [phase, setPhase] = useState<"orders" | "entries" | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const handleClear = async () => {
+    setClearing(true);
+    try {
+      await fetch(`/api/kaspi/stores/${store.id}/orders-reset`, { method: "DELETE" });
+      setHistory([]);
+      router.refresh();
+    } finally {
+      setClearing(false);
+      setConfirmClear(false);
+    }
+  };
 
   // Синк заказов → потом синк состава (позиций)
   const handleSync = async (days: number) => {
@@ -158,6 +174,29 @@ function StoreSyncCard({ store }: { store: StoreRow }) {
           <CalendarDays className="h-3.5 w-3.5" />
           За последние 14 дней
         </button>
+
+        {/* Очистить заказы — danger, с подтверждением */}
+        {confirmClear ? (
+          <div className="inline-flex items-center gap-1.5 rounded-[var(--radius)] border border-[var(--red)]/40 bg-[var(--red-soft)] px-2.5 py-2 text-[11px]">
+            <span className="text-[var(--red)]">Удалить все заказы?</span>
+            <button onClick={handleClear} disabled={clearing}
+              className="rounded px-1.5 py-0.5 font-medium text-[var(--red)] hover:bg-[var(--red)]/15">
+              {clearing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Да, очистить"}
+            </button>
+            <button onClick={() => setConfirmClear(false)} disabled={clearing}
+              className="rounded px-1.5 py-0.5 text-[var(--text-dim)] hover:bg-white/[0.06]">Нет</button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmClear(true)}
+            disabled={busy}
+            title="Удалить все заказы и состояние синхронизации, чтобы синхронизировать заново"
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-[12px] font-medium text-[var(--text-dim)] hover:border-[var(--red)]/50 hover:text-[var(--red)] disabled:opacity-40"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Очистить заказы
+          </button>
+        )}
       </div>
 
       {/* Live progress — заказы */}
