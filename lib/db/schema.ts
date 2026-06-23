@@ -410,6 +410,71 @@ export const tgRecipients = pgTable(
 
 export type TgRecipient = typeof tgRecipients.$inferSelect;
 
+/**
+ * Товары магазина — выгрузка из МойСклад (Excel).
+ * Отображаемые/поисковые поля — отдельными колонками, всё остальное — в raw (jsonb).
+ * Upsert по (store_id, external_uuid).
+ */
+export const products = pgTable(
+  "products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    externalUuid: text("external_uuid").notNull(), // UUID из МойСклад (колонка B)
+    code: text("code"),                            // Код (D)
+    name: text("name").notNull(),                  // Наименование (E)
+    salePrice: doublePrecision("sale_price").default(0), // Цена продажи (I)
+    currency: text("currency"),                    // Валюта (J)
+    barcode: text("barcode"),                      // Штрихкод EAN13 (AB)
+    kaspiUrl: text("kaspi_url"),                   // Ссылка на товар в Kaspi (BN)
+    brand: text("brand"),                          // Бренд (BU)
+    groupName: text("group_name"),                 // Группы (A)
+    supplier: text("supplier"),                    // Поставщик (AO)
+    archived: boolean("archived").default(false),  // Архивный (AR)
+    imageUrl: text("image_url"),                   // Cloudinary URL
+    imagePublicId: text("image_public_id"),        // Cloudinary public_id (для замены/удаления)
+    raw: jsonb("raw"),                             // все остальные колонки «на всякий случай»
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_products_store_external").on(t.storeId, t.externalUuid),
+    index("products_store_idx").on(t.storeId),
+    index("products_code_idx").on(t.code),
+  ],
+);
+
+export type Product = typeof products.$inferSelect;
+export type NewProduct = typeof products.$inferInsert;
+
+/**
+ * Поставщики — контакты для отправки заказов в Telegram.
+ * `name` совпадает с полем «Поставщик» в товарах (products.supplier).
+ * Заполняется вручную через модалку. Хранит chat ID (личка) и ID группы.
+ */
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),          // = products.supplier
+    tgChatId: text("tg_chat_id"),          // личный chat ID
+    tgGroupId: text("tg_group_id"),        // ID группы (отрицательный)
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_suppliers_store_name").on(t.storeId, t.name),
+    index("suppliers_store_idx").on(t.storeId),
+  ],
+);
+
+export type Supplier = typeof suppliers.$inferSelect;
+
 export type AdCampaign = typeof adCampaigns.$inferSelect;
 export type NewAdCampaign = typeof adCampaigns.$inferInsert;
 export type AdWeeklyStat = typeof adWeeklyStats.$inferSelect;

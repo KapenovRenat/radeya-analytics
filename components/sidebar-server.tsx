@@ -59,6 +59,7 @@ export async function SidebarServer() {
       title: "Ассортимент",
       defaultOpen: false,
       items: [
+        { href: p("/products"), label: "Товары", iconName: "Package" },
         { href: p("/sku"), label: "ABC / XYZ матрица", iconName: "Layers" },
         { href: "/top-sku", label: "Топ-SKU", iconName: "Trophy" },
         { href: "/slow-movers", label: "Slow movers", iconName: "Snowflake" },
