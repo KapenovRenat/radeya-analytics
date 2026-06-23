@@ -435,6 +435,12 @@ export const products = pgTable(
     archived: boolean("archived").default(false),  // Архивный (AR)
     imageUrl: text("image_url"),                   // Cloudinary URL
     imagePublicId: text("image_public_id"),        // Cloudinary public_id (для замены/удаления)
+    // Сроки по складам (дни) — для расчёта даты прибытия (колонки BV–BZ)
+    whAstana: integer("wh_astana").default(0),         // Склад Астана
+    whPavlodar: integer("wh_pavlodar").default(0),     // Склад Павлодар
+    whKostanay: integer("wh_kostanay").default(0),     // Склад Костанай
+    whPetropavlovsk: integer("wh_petropavlovsk").default(0), // Склад Петропавловск
+    whAlmaty: integer("wh_almaty").default(0),         // Склад Алматы
     raw: jsonb("raw"),                             // все остальные колонки «на всякий случай»
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -474,6 +480,54 @@ export const suppliers = pgTable(
 );
 
 export type Supplier = typeof suppliers.$inferSelect;
+
+/**
+ * Настройки авто-отправки заказов поставщику (per-store).
+ */
+export const dispatchSettings = pgTable("dispatch_settings", {
+  storeId: uuid("store_id")
+    .primaryKey()
+    .references(() => kaspiStores.id, { onDelete: "cascade" }),
+  autoSendEnabled: boolean("auto_send_enabled").notNull().default(true),
+  delayMinutes: integer("delay_minutes").notNull().default(60),     // задержка перед отправкой
+  cronIntervalMin: integer("cron_interval_min").notNull().default(2), // интервал опроса
+  dopText: text("dop_text").notNull().default("‼️ Паспорт приложить. Шильдик Radeya"),
+  lastCronRunAt: timestamp("last_cron_run_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type DispatchSettings = typeof dispatchSettings.$inferSelect;
+
+/**
+ * Журнал отправок заказов поставщикам (анти-дубль).
+ * Одна строка на (заказ × поставщик). Уникальный индекс не даёт отправить дважды.
+ */
+export const orderDispatches = pgTable(
+  "order_dispatches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => kaspiOrders.id, { onDelete: "cascade" }),
+    orderCode: text("order_code").notNull(),
+    supplierName: text("supplier_name").notNull(),
+    target: text("target"),                  // куда отправили (группа/чат + id)
+    itemsCount: integer("items_count").default(0),
+    status: text("status").notNull().default("sent"), // sent | failed
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_order_dispatches").on(t.orderId, t.supplierName),
+    index("order_dispatches_store_idx").on(t.storeId),
+    index("order_dispatches_order_idx").on(t.orderId),
+  ],
+);
+
+export type OrderDispatch = typeof orderDispatches.$inferSelect;
 
 export type AdCampaign = typeof adCampaigns.$inferSelect;
 export type NewAdCampaign = typeof adCampaigns.$inferInsert;

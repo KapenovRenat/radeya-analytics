@@ -19,6 +19,11 @@ export interface ParsedProduct {
   groupName: string | null;
   supplier: string | null;
   archived: boolean;
+  whAstana: number;
+  whPavlodar: number;
+  whKostanay: number;
+  whPetropavlovsk: number;
+  whAlmaty: number;
   raw: Record<string, string>;
 }
 
@@ -35,7 +40,19 @@ const COL = {
   group: "Группы",
   supplier: "Поставщик",
   archived: "Архивный",
+  whAstana: "Доп. поле: Склад Астана",
+  whPavlodar: "Доп. поле: Склад Павлодар",
+  whKostanay: "Доп. поле: Склад Костанай",
+  whPetropavlovsk: "Доп. поле: Склад Петропавловск",
+  whAlmaty: "Доп. поле: Склад Алматы",
 } as const;
+
+/** "5" / "" → число дней (пусто → 0) */
+function parseDays(s: string | undefined): number {
+  if (!s) return 0;
+  const n = parseInt(String(s).replace(/[^\d-]/g, ""), 10);
+  return isNaN(n) ? 0 : n;
+}
 
 /** "103 200,00" / "103200,00" → 103200 */
 function parsePrice(s: string | undefined): number {
@@ -83,6 +100,11 @@ export function parseProductsXlsx(buffer: Buffer): ParsedProduct[] {
       groupName: str(row[COL.group]) || null,
       supplier: str(row[COL.supplier]) || null,
       archived: str(row[COL.archived]).toLowerCase() === "да",
+      whAstana: parseDays(str(row[COL.whAstana])),
+      whPavlodar: parseDays(str(row[COL.whPavlodar])),
+      whKostanay: parseDays(str(row[COL.whKostanay])),
+      whPetropavlovsk: parseDays(str(row[COL.whPetropavlovsk])),
+      whAlmaty: parseDays(str(row[COL.whAlmaty])),
       raw,
     });
   }

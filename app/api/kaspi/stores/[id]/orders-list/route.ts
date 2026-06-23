@@ -9,9 +9,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and, or, ilike, desc, sql } from "drizzle-orm";
+import { eq, and, or, ilike, desc, sql, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { kaspiOrders } from "@/lib/db/schema";
+import { kaspiOrders, orderDispatches } from "@/lib/db/schema";
 import { mapOrderStatus, mapOrderState } from "@/lib/kaspi/order-status";
 
 export const dynamic = "force-dynamic";
@@ -51,8 +51,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       state: kaspiOrders.state,
       waybillNumber: kaspiOrders.waybillNumber,
       isKaspiDelivery: kaspiOrders.isKaspiDelivery,
+      assembled: kaspiOrders.assembled,
       customerName: kaspiOrders.customerName,
       deliveryAddressCity: kaspiOrders.deliveryAddressCity,
+      preOrder: sql<string | null>`${kaspiOrders.rawData}->'attributes'->>'preOrder'`,
+      courierTx: sql<string | null>`${kaspiOrders.rawData}->'attributes'->'kaspiDelivery'->>'courierTransmissionDate'`,
     })
     .from(kaspiOrders)
     .where(where)
@@ -61,7 +64,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     .offset(statusFilter ? 0 : (page - 1) * PAGE_SIZE);
 
   let mapped = rows.map((o) => {
-    const ds = mapOrderStatus(o.status, o.state, o.waybillNumber);
+    const ds = mapOrderStatus({
+      status: o.status,
+      state: o.state,
+      waybillNumber: o.waybillNumber,
+      preOrder: o.preOrder === "true",
+      assembled: o.assembled ?? false,
+      courierTransmitted: !!o.courierTx,
+    });
     return {
       id: o.id,
       orderCode: o.orderCode,
@@ -73,6 +83,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       state: mapOrderState(o.state, o.isKaspiDelivery),
       customerName: o.customerName,
       city: o.deliveryAddressCity,
+      dispatched: false,
     };
   });
 
@@ -84,6 +95,21 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     total = filtered.length;
     totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     mapped = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }
+
+  // Отметка «отправлен поставщику» для заказов текущей страницы (не валит список при ошибке)
+  const ids = mapped.map((m) => m.id);
+  if (ids.length > 0) {
+    try {
+      const dispatched = await db
+        .selectDistinct({ orderId: orderDispatches.orderId })
+        .from(orderDispatches)
+        .where(inArray(orderDispatches.orderId, ids));
+      const dispatchedSet = new Set(dispatched.map((d) => d.orderId));
+      mapped = mapped.map((m) => ({ ...m, dispatched: dispatchedSet.has(m.id) }));
+    } catch {
+      /* таблица ещё не создана / ошибка — оставляем dispatched=false */
+    }
   }
 
   return NextResponse.json({ orders: mapped, total, page, pageSize: PAGE_SIZE, totalPages });

@@ -63,6 +63,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           groupName: p.groupName,
           supplier: p.supplier,
           archived: p.archived,
+          whAstana: p.whAstana,
+          whPavlodar: p.whPavlodar,
+          whKostanay: p.whKostanay,
+          whPetropavlovsk: p.whPetropavlovsk,
+          whAlmaty: p.whAlmaty,
           raw: p.raw,
         })),
       )
@@ -79,6 +84,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           groupName: sql`excluded.group_name`,
           supplier: sql`excluded.supplier`,
           archived: sql`excluded.archived`,
+          whAstana: sql`excluded.wh_astana`,
+          whPavlodar: sql`excluded.wh_pavlodar`,
+          whKostanay: sql`excluded.wh_kostanay`,
+          whPetropavlovsk: sql`excluded.wh_petropavlovsk`,
+          whAlmaty: sql`excluded.wh_almaty`,
           raw: sql`excluded.raw`,
           updatedAt: sql`now()`,
           // imageUrl / imagePublicId НЕ перезаписываем — картинка живёт отдельно

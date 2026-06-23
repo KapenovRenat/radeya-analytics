@@ -29,6 +29,38 @@ export async function sendTelegramMessage(
   }
 }
 
+/**
+ * Отправить фото с подписью (для карточки товара поставщику).
+ * photoUrl должен быть публично доступен (Cloudinary).
+ */
+export async function sendTelegramPhoto(
+  botToken: string,
+  chatId: string,
+  photoUrl: string,
+  caption: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendPhoto`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId.trim(),
+          photo: photoUrl,
+          caption,
+          parse_mode: "HTML",
+        }),
+      },
+    );
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.description ?? "Telegram error" };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
 export function tgFmt(n: number): string {
   return n.toLocaleString("ru-RU");
 }

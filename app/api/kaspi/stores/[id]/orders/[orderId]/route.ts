@@ -42,7 +42,15 @@ export async function GET(
     .where(eq(kaspiOrderEntries.orderId, orderId))
     .orderBy(asc(kaspiOrderEntries.entryNumber));
 
-  const ds = mapOrderStatus(order.status, order.state, order.waybillNumber);
+  const attrs = (order.rawData as { attributes?: { preOrder?: boolean; kaspiDelivery?: { courierTransmissionDate?: number | null } } } | null)?.attributes;
+  const ds = mapOrderStatus({
+    status: order.status,
+    state: order.state,
+    waybillNumber: order.waybillNumber,
+    preOrder: attrs?.preOrder === true,
+    assembled: order.assembled ?? false,
+    courierTransmitted: !!attrs?.kaspiDelivery?.courierTransmissionDate,
+  });
 
   return NextResponse.json({
     order: {
