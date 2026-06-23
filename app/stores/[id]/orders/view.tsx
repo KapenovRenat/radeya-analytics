@@ -22,6 +22,7 @@ import { RecommendationBlock, type Recommendation } from "@/components/page/reco
 import { Card, CardBody, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartTooltip } from "@/components/chart-primitives";
 import { useAnalytics } from "@/lib/use-analytics";
+import { OrdersTable } from "./orders-table";
 import { cn } from "@/lib/utils";
 import { formatNumber, formatPercent } from "@/lib/format";
 import { DOW_LABELS_SHORT, STATUS_COLORS, STATUS_LABELS, formatPeriodLabel } from "@/lib/kaspi/labels";
@@ -345,6 +346,12 @@ export function OrdersView({ storeId, storeName }: { storeId: string; storeName:
             </CardBody>
           </Card>
         </div>
+
+      {/* Таблица всех заказов */}
+      <div className="mt-2">
+        <h2 className="mb-3 text-[15px] font-semibold tracking-tight text-[var(--text)]">Все заказы</h2>
+        <OrdersTable storeId={storeId} />
+      </div>
 
       {data && <AiInsightBlock insights={insights} isMock={false} />}
       <RecommendationBlock items={recs} />

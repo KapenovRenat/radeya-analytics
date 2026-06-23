@@ -7,6 +7,7 @@ import {
   CheckCircle2, Loader2, Store as StoreIcon, History, Plus,
 } from "lucide-react";
 import { useSync } from "@/lib/use-sync";
+import { useEntriesSync } from "@/lib/use-entries-sync";
 import { formatDate, formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -70,8 +71,21 @@ function StatusBadge({ status }: { status: string | null }) {
 
 function StoreSyncCard({ store }: { store: StoreRow }) {
   const { status, running, startSync } = useSync(store.id);
+  const { status: entriesStatus, running: entriesRunning, start: startEntries } = useEntriesSync(store.id);
+  const [phase, setPhase] = useState<"orders" | "entries" | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Синк заказов → потом синк состава (позиций)
+  const handleSync = async (days: number) => {
+    if (phase) return;
+    setPhase("orders");
+    await startSync(days);
+    setPhase("entries");
+    await startEntries();
+    setPhase(null);
+  };
+  const busy = phase !== null || running || entriesRunning;
 
   const loadHistory = useCallback(async () => {
     try {
@@ -119,11 +133,11 @@ function StoreSyncCard({ store }: { store: StoreRow }) {
       {/* Buttons */}
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={() => startSync(365)}
-          disabled={running}
+          onClick={() => handleSync(365)}
+          disabled={busy}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-[var(--radius)] px-3 py-2 text-[12px] font-medium transition-colors",
-            running
+            busy
               ? "cursor-not-allowed bg-[var(--surface-elev)] text-[var(--text-subtle)]"
               : "bg-[var(--accent)] text-white hover:opacity-90",
           )}
@@ -132,11 +146,11 @@ function StoreSyncCard({ store }: { store: StoreRow }) {
           Синхронизация за год
         </button>
         <button
-          onClick={() => startSync(14)}
-          disabled={running}
+          onClick={() => handleSync(14)}
+          disabled={busy}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-[var(--radius)] border px-3 py-2 text-[12px] font-medium transition-colors",
-            running
+            busy
               ? "cursor-not-allowed border-[var(--border)] text-[var(--text-subtle)]"
               : "border-[var(--border-strong)] text-[var(--text)] hover:border-[var(--accent)] hover:text-[var(--accent)]",
           )}
@@ -146,24 +160,34 @@ function StoreSyncCard({ store }: { store: StoreRow }) {
         </button>
       </div>
 
-      {/* Live progress */}
-      {running && status && (
+      {/* Live progress — заказы */}
+      {(phase === "orders" || (running && !phase)) && status && (
         <div className="flex flex-col gap-1.5">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-elev)]">
-            <div
-              className="h-full rounded-full bg-[var(--accent)] transition-all"
-              style={{ width: `${Math.round((status.progress ?? 0) * 100)}%` }}
-            />
+            <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${Math.round((status.progress ?? 0) * 100)}%` }} />
           </div>
           <p className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
             <Loader2 className="h-3 w-3 animate-spin" />
-            Чанк {status.chunksDone}/{status.totalChunks} · {formatNumber(status.ordersSynced)} заказов загружено
+            Заказы · чанк {status.chunksDone}/{status.totalChunks} · {formatNumber(status.ordersSynced)} загружено
+          </p>
+        </div>
+      )}
+
+      {/* Live progress — позиции (состав) */}
+      {phase === "entries" && entriesStatus && (
+        <div className="flex flex-col gap-1.5">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-elev)]">
+            <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${Math.round((entriesStatus.progress ?? 0) * 100)}%` }} />
+          </div>
+          <p className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Состав заказов · {entriesStatus.ordersProcessed}/{entriesStatus.totalOrders} · {formatNumber(entriesStatus.entriesSynced)} позиций
           </p>
         </div>
       )}
 
       {/* Done flash */}
-      {!running && liveStatus === "done" && status && (
+      {!busy && liveStatus === "done" && status && (
         <p className="flex items-center gap-1.5 text-[11px] text-[var(--emerald)]">
           <CheckCircle2 className="h-3.5 w-3.5" />
           Готово — синхронизировано {formatNumber(status.ordersSynced)} заказов
