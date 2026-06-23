@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check, Trash2, Loader2, Plus, Calendar, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DatePicker } from "@/components/ui/date-picker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -465,16 +466,19 @@ export function WeekSelector({
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
                       <label className="block text-[10px] text-[var(--text-subtle)] mb-0.5">С</label>
-                      <input type="date" value={createFrom}
-                        onChange={(e) => { setCreateFrom(e.target.value); if (!createTo) setCreateTo(e.target.value); }}
-                        className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[11px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]"
+                      <DatePicker
+                        value={createFrom}
+                        onChange={(iso) => { setCreateFrom(iso); if (!createTo) setCreateTo(iso); }}
+                        placeholder="дата"
                       />
                     </div>
                     <div className="flex-1">
                       <label className="block text-[10px] text-[var(--text-subtle)] mb-0.5">По</label>
-                      <input type="date" value={createTo} min={createFrom}
-                        onChange={(e) => setCreateTo(e.target.value)}
-                        className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[11px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]"
+                      <DatePicker
+                        value={createTo}
+                        onChange={(iso) => setCreateTo(iso)}
+                        min={createFrom || undefined}
+                        placeholder="дата"
                       />
                     </div>
                   </div>

@@ -7,6 +7,7 @@ export interface DashboardKpis {
   cancelledOrders: number;
   returnedOrders: number;
   totalRevenue: number;
+  grossRevenue?: number;
   avgOrderValue: number;
   uniqueCustomers: number;
   cancellationRate: number;

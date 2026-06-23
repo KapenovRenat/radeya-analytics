@@ -104,6 +104,33 @@ export const kaspiSyncState = pgTable("kaspi_sync_state", {
 });
 
 /**
+ * История синхронизаций — одна строка на каждый завершённый (или упавший) синк.
+ * Пишется в finishSync (done) и в catch-блоке stepSync (failed).
+ * Питает страницу /sync (список «История синков с длительностью»).
+ */
+export const kaspiSyncHistory = pgTable(
+  "kaspi_sync_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => kaspiStores.id, { onDelete: "cascade" }),
+    periodFrom: timestamp("period_from", { withTimezone: true }),
+    periodTo: timestamp("period_to", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }).notNull().defaultNow(),
+    durationSec: integer("duration_sec").default(0),
+    ordersSynced: integer("orders_synced").default(0),
+    status: text("status").notNull(), // done | failed
+    error: text("error"),
+  },
+  (t) => [
+    index("sync_history_store_idx").on(t.storeId),
+    index("sync_history_finished_idx").on(t.finishedAt),
+  ],
+);
+
+/**
  * Order line items from /orders/{id}/entries endpoint.
  * Populated by the entries-sync step (separate from main orders sync).
  *
@@ -397,5 +424,7 @@ export type NewKaspiStore = typeof kaspiStores.$inferInsert;
 export type KaspiOrder = typeof kaspiOrders.$inferSelect;
 export type NewKaspiOrder = typeof kaspiOrders.$inferInsert;
 export type KaspiSyncState = typeof kaspiSyncState.$inferSelect;
+export type KaspiSyncHistory = typeof kaspiSyncHistory.$inferSelect;
+export type NewKaspiSyncHistory = typeof kaspiSyncHistory.$inferInsert;
 export type KaspiOrderEntry = typeof kaspiOrderEntries.$inferSelect;
 export type NewKaspiOrderEntry = typeof kaspiOrderEntries.$inferInsert;

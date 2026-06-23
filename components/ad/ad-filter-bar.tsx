@@ -15,6 +15,7 @@
 import { useMemo } from "react";
 import { Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DateRangePicker } from "@/components/ui/date-picker";
 
 export type Granularity = "daily" | "weekly" | "monthly";
 
@@ -79,25 +80,8 @@ export function AdFilterBar({ from, to, onChange, granularity, onGranularity, ex
         </div>
       </div>
 
-      {/* Custom date inputs */}
-      <div className="flex items-center gap-1">
-        <input
-          type="date"
-          value={from}
-          max={to}
-          onChange={(e) => onChange(e.target.value, to)}
-          className="h-7 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-elev)] px-2 text-[11px] text-[var(--text)] tabular-nums hover:border-[var(--border-strong)] focus:border-[var(--border-focus)] focus:outline-none"
-        />
-        <span className="text-[11px] text-[var(--text-dim)]">—</span>
-        <input
-          type="date"
-          value={to}
-          min={from}
-          max={today}
-          onChange={(e) => onChange(from, e.target.value)}
-          className="h-7 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-elev)] px-2 text-[11px] text-[var(--text)] tabular-nums hover:border-[var(--border-strong)] focus:border-[var(--border-focus)] focus:outline-none"
-        />
-      </div>
+      {/* Custom date range */}
+      <DateRangePicker from={from} to={to} max={today} onChange={onChange} />
 
       {/* Granularity (optional) */}
       {granularity && onGranularity && (

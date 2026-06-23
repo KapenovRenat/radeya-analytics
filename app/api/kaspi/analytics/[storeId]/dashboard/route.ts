@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ storeId: st
     const [kpis, compare, series, top] = await Promise.all([
       dashboardKpis(r),
       periodComparison(r),
-      revenueByPeriod(r, r.period),
+      revenueByPeriod(r, r.period, true), // gross: график дашборда = все заказы
       topDays(r, 10),
     ]);
     return NextResponse.json({

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DateRangePicker } from "@/components/ui/date-picker";
 
 export type Granularity = "daily" | "weekly" | "monthly";
 
@@ -109,22 +110,12 @@ export function FilterBar() {
       </div>
 
       {/* Custom date range */}
-      <div className="hidden items-center gap-1 md:flex">
-        <input
-          type="date"
-          value={from}
-          max={to}
-          onChange={(e) => setParams({ from: e.target.value })}
-          className="h-7 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-elev)] px-2 text-[11px] text-[var(--text)] tabular hover:border-[var(--border-strong)] focus:border-[var(--border-focus)] focus:outline-none"
-        />
-        <span className="text-[11px] text-[var(--text-dim)]">—</span>
-        <input
-          type="date"
-          value={to}
-          min={from}
+      <div className="hidden md:block">
+        <DateRangePicker
+          from={from}
+          to={to}
           max={getToday()}
-          onChange={(e) => setParams({ to: e.target.value })}
-          className="h-7 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-elev)] px-2 text-[11px] text-[var(--text)] tabular hover:border-[var(--border-strong)] focus:border-[var(--border-focus)] focus:outline-none"
+          onChange={(f, t) => setParams({ from: f, to: t, g: null })}
         />
       </div>
 

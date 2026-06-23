@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "db:migrate": "npx dotenv-cli -e .env.local -- npx drizzle-kit push",
     "deploy": "git pull && npm install && npx dotenv-cli -e .env.local -- npx drizzle-kit push && npm run build && pm2 restart radeya-analytics"
   },
   "dependencies": {

@@ -7,7 +7,7 @@
  */
 import { eq, sql } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { kaspiStores, kaspiOrders, kaspiSyncState } from "../db/schema";
+import { kaspiStores, kaspiOrders, kaspiSyncState, kaspiSyncHistory } from "../db/schema";
 import { decryptToken } from "./fernet";
 import { buildChunks, fetchOrdersForChunk, MAX_KASPI_DATE_RANGE_DAYS } from "./client";
 import { mapKaspiOrder } from "./mapper";
@@ -198,6 +198,7 @@ export async function stepSync(storeId: string): Promise<SyncStepResult> {
       .update(kaspiStores)
       .set({ lastSyncStatus: "failed", lastSyncError: message })
       .where(eq(kaspiStores.id, storeId));
+    await logSyncHistory(storeId, state, "failed", message);
     return {
       status: "failed",
       progress: chunksDone / chunks.length,
@@ -227,6 +228,40 @@ async function finishSync(storeId: string, finalStatus: "done" | "failed") {
       totalOrdersCount: count,
     })
     .where(eq(kaspiStores.id, storeId));
+
+  await logSyncHistory(storeId, state, finalStatus);
+}
+
+/**
+ * Записать строку в историю синхронизаций (вызывается при done и failed).
+ */
+async function logSyncHistory(
+  storeId: string,
+  state: {
+    overallStart: Date | null;
+    overallEnd: Date | null;
+    startedAt: Date | null;
+    ordersSynced: number | null;
+  },
+  status: "done" | "failed",
+  error?: string | null,
+) {
+  const db = getDb();
+  const finishedAt = new Date();
+  const durationSec = state.startedAt
+    ? Math.max(0, Math.round((finishedAt.getTime() - state.startedAt.getTime()) / 1000))
+    : 0;
+  await db.insert(kaspiSyncHistory).values({
+    storeId,
+    periodFrom: state.overallStart,
+    periodTo: state.overallEnd,
+    startedAt: state.startedAt,
+    finishedAt,
+    durationSec,
+    ordersSynced: state.ordersSynced ?? 0,
+    status,
+    error: error ?? null,
+  });
 }
 
 function stateToResult(state: {

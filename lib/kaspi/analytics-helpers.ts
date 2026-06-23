@@ -18,8 +18,12 @@ function autoPeriod(from: Date, to: Date): Period {
 export function parseRange(req: NextRequest, storeId: string): RangeQuery {
   const sp = req.nextUrl.searchParams;
   const now = new Date();
-  const to = sp.get("to") ? new Date(sp.get("to")!) : now;
-  const from = sp.get("from") ? new Date(sp.get("from")!) : new Date(now.getTime() - 30 * 86_400_000);
+  const toParam = sp.get("to");
+  // Конец дня: "2026-06-21" → 21 июня 23:59:59.999 UTC, чтобы заказы
+  // последнего дня периода не выпадали из выборки.
+  const to = toParam ? new Date(toParam + "T23:59:59.999Z") : now;
+  const fromParam = sp.get("from");
+  const from = fromParam ? new Date(fromParam + "T00:00:00.000Z") : new Date(now.getTime() - 30 * 86_400_000);
   const periodParam = sp.get("g") as Period | null;
   const period: Period =
     periodParam && ["daily", "weekly", "monthly"].includes(periodParam)

@@ -136,7 +136,7 @@ export function SettingsView({ storeId, store }: { storeId: string; store: Store
               <span>Последняя ошибка: {store.lastSyncError}</span>
             </div>
           )}
-          <Button variant="primary" onClick={startSync} disabled={syncing}>
+          <Button variant="primary" onClick={() => startSync(365)} disabled={syncing}>
             <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "Синхронизация…" : "Запустить полную синхронизацию (365 дней)"}
           </Button>

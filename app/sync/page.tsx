@@ -1,18 +1,39 @@
-import { ComingSoonPage } from "@/components/page/coming-soon";
+import { desc } from "drizzle-orm";
+import { getDb } from "@/lib/db/client";
+import { kaspiStores } from "@/lib/db/schema";
+import { PageShell } from "@/components/page/page-shell";
+import { SyncClient } from "./sync-client";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
-export default function SyncPage() {
+async function getStores() {
+  try {
+    const db = getDb();
+    const rows = await db
+      .select({
+        id: kaspiStores.id,
+        name: kaspiStores.name,
+        lastSyncAt: kaspiStores.lastSyncAt,
+        lastSyncStatus: kaspiStores.lastSyncStatus,
+        lastSyncError: kaspiStores.lastSyncError,
+        totalOrdersCount: kaspiStores.totalOrdersCount,
+      })
+      .from(kaspiStores)
+      .orderBy(desc(kaspiStores.createdAt));
+    return rows.map((s) => ({
+      ...s,
+      lastSyncAt: s.lastSyncAt ? s.lastSyncAt.toISOString() : null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export default async function SyncPage() {
+  const stores = await getStores();
   return (
-    <ComingSoonPage
-      title="Синхронизация"
-      description="Статус синхронизации с Kaspi API. Когда последний раз тянули данные, сколько чанков обработано, есть ли ошибки."
-      blocks={[
-        "Last-sync timestamp по каждому магазину",
-        "История синков с длительностью",
-        "Кнопка ручного запуска / pause / resume",
-        "Логи ошибок (если есть)",
-      ]}
-    />
+    <PageShell title="Синхронизация" subtitle="Статус и история синхронизации с Kaspi API">
+      <SyncClient stores={stores} />
+    </PageShell>
   );
 }

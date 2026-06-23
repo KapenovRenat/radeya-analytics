@@ -33,8 +33,15 @@ export interface Range {
    All filter status = 'COMPLETED' for revenue correctness.
    ──────────────────────────────────────────────────────────────── */
 
-export async function revenueByPeriod({ storeId, from, to }: Range, period: Period = "daily") {
+export async function revenueByPeriod(
+  { storeId, from, to }: Range,
+  period: Period = "daily",
+  gross = false,
+) {
   const trunc = PERIOD_MAP[period];
+  // gross=false → только выполненные (реальная выручка);
+  // gross=true  → все заказы любого статуса (валовая, как в Kaspi-кабинете)
+  const statusFilter = gross ? sql`` : sql`AND status = 'COMPLETED'`;
   const { rows } = await getDb().execute<{ period: string; revenue: number; orders: number }>(sql`
     SELECT
       to_char(date_trunc(${trunc}, creation_date), 'YYYY-MM-DD') AS period,
@@ -44,7 +51,7 @@ export async function revenueByPeriod({ storeId, from, to }: Range, period: Peri
     WHERE store_id = ${storeId}
       AND creation_date >= ${from.toISOString()}
       AND creation_date <= ${to.toISOString()}
-      AND status = 'COMPLETED'
+      ${statusFilter}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -487,7 +494,8 @@ export interface DashboardKpis {
   completedOrders: number;
   cancelledOrders: number;
   returnedOrders: number;
-  totalRevenue: number;
+  totalRevenue: number;   // выполненная (status = COMPLETED)
+  grossRevenue: number;   // валовая (все статусы, как в Kaspi-кабинете)
   avgOrderValue: number;
   uniqueCustomers: number;
   cancellationRate: number;
@@ -503,6 +511,7 @@ export async function dashboardKpis({ storeId, from, to }: Range): Promise<Dashb
     cancelled_orders: number;
     returned_orders: number;
     total_revenue: number;
+    gross_revenue: number;
     avg_order_value: number;
     unique_customers: number;
     kaspi_delivery: number;
@@ -514,6 +523,7 @@ export async function dashboardKpis({ storeId, from, to }: Range): Promise<Dashb
       SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END)::int AS cancelled_orders,
       SUM(CASE WHEN status = 'RETURNED' THEN 1 ELSE 0 END)::int AS returned_orders,
       COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_price ELSE 0 END), 0)::float AS total_revenue,
+      COALESCE(SUM(total_price), 0)::float AS gross_revenue,
       COALESCE(AVG(CASE WHEN status = 'COMPLETED' THEN total_price END), 0)::float AS avg_order_value,
       COUNT(DISTINCT CASE WHEN status = 'COMPLETED' THEN customer_name END)::int AS unique_customers,
       SUM(CASE WHEN is_kaspi_delivery AND status = 'COMPLETED' THEN 1 ELSE 0 END)::int AS kaspi_delivery,
@@ -527,7 +537,7 @@ export async function dashboardKpis({ storeId, from, to }: Range): Promise<Dashb
   if (!r) {
     return {
       totalOrders: 0, completedOrders: 0, cancelledOrders: 0, returnedOrders: 0,
-      totalRevenue: 0, avgOrderValue: 0, uniqueCustomers: 0,
+      totalRevenue: 0, grossRevenue: 0, avgOrderValue: 0, uniqueCustomers: 0,
       cancellationRate: 0, returnRate: 0, kaspiDeliveryShare: 0, totalDeliveryCost: 0,
     };
   }
@@ -538,6 +548,7 @@ export async function dashboardKpis({ storeId, from, to }: Range): Promise<Dashb
     cancelledOrders: r.cancelled_orders,
     returnedOrders: r.returned_orders,
     totalRevenue: r.total_revenue,
+    grossRevenue: r.gross_revenue,
     avgOrderValue: r.avg_order_value,
     uniqueCustomers: r.unique_customers,
     cancellationRate: total > 0 ? (r.cancelled_orders / total) * 100 : 0,
@@ -571,8 +582,8 @@ export async function periodComparison(range: Range): Promise<PeriodComparison> 
     current,
     previous,
     changes: {
-      revenue: pct(current.totalRevenue, previous.totalRevenue),
-      orders: pct(current.completedOrders, previous.completedOrders),
+      revenue: pct(current.grossRevenue, previous.grossRevenue),
+      orders: pct(current.totalOrders, previous.totalOrders),
       avgOrderValue: pct(current.avgOrderValue, previous.avgOrderValue),
       customers: pct(current.uniqueCustomers, previous.uniqueCustomers),
     },

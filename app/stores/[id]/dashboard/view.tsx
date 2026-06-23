@@ -35,6 +35,7 @@ interface DashboardData {
     cancelledOrders: number;
     returnedOrders: number;
     totalRevenue: number;
+    grossRevenue: number;
     avgOrderValue: number;
     uniqueCustomers: number;
     cancellationRate: number;
@@ -64,9 +65,9 @@ function buildHeadline(d: DashboardData | null): string {
   if (!d) return "Сводка магазина за выбранный период.";
   const k = d.kpis;
   const c = d.compare.changes;
-  const revStr = `${formatCompactMoney(k.totalRevenue)} выручки`;
+  const revStr = `${formatCompactMoney(k.grossRevenue)} выручки`;
   const deltaStr = Math.abs(c.revenue) >= 1 ? ` (${c.revenue >= 0 ? "+" : ""}${c.revenue.toFixed(1)}% к прошлому окну)` : "";
-  return `${revStr}${deltaStr}, ${formatNumber(k.completedOrders)} заказов, средний чек ${formatCompactMoney(k.avgOrderValue)}.`;
+  return `${revStr}${deltaStr}, ${formatNumber(k.totalOrders)} заказов, средний чек ${formatCompactMoney(k.avgOrderValue)}.`;
 }
 
 export function DashboardView({ storeId, storeName }: { storeId: string; storeName: string }) {
@@ -78,14 +79,14 @@ export function DashboardView({ storeId, storeName }: { storeId: string; storeNa
     ? [
         {
           label: "Выручка",
-          value: formatCompactMoney(data.kpis.totalRevenue),
-          hint: formatMoney(data.kpis.totalRevenue),
+          value: formatCompactMoney(data.kpis.grossRevenue),
+          hint: `выполнено ${formatCompactMoney(data.kpis.totalRevenue)}`,
           delta: { value: data.compare.changes.revenue },
         },
         {
           label: "Заказов",
-          value: formatNumber(data.kpis.completedOrders),
-          hint: "выполнено",
+          value: formatNumber(data.kpis.totalOrders),
+          hint: `выполнено ${formatNumber(data.kpis.completedOrders)}`,
           delta: { value: data.compare.changes.orders },
         },
         {
@@ -119,7 +120,7 @@ export function DashboardView({ storeId, storeName }: { storeId: string; storeNa
   const recs = generateDashboardRecommendations(
     data?.kpis ?? {
       totalOrders: 0, completedOrders: 0, cancelledOrders: 0, returnedOrders: 0,
-      totalRevenue: 0, avgOrderValue: 0, uniqueCustomers: 0,
+      totalRevenue: 0, grossRevenue: 0, avgOrderValue: 0, uniqueCustomers: 0,
       cancellationRate: 0, returnRate: 0, kaspiDeliveryShare: 0,
     },
     `/stores/${storeId}`,
