@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export function middleware(req: NextRequest) {
   if (req.nextUrl.pathname === "/api/health") return NextResponse.next();
+  // Cron-эндпоинт защищён собственным секретом (CRON_SECRET), Basic Auth ему не нужен —
+  // иначе системный crontab без логина получит 401.
+  if (req.nextUrl.pathname.startsWith("/api/cron/")) return NextResponse.next();
 
   // Public demo mode: skip Basic Auth entirely.
   // Set PUBLIC_DEMO env var (any value, even empty) to disable auth — used for
