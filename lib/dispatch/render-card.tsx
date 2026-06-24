@@ -46,7 +46,7 @@ async function loadFonts(): Promise<{ regular: ArrayBuffer; bold: ArrayBuffer; b
 function orderHeader(orderNo: string, orderCode: string) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{ display: "flex", fontSize: 24, fontWeight: 700, color: "#FFFFFF" }}>ЗАКАЗ</div>
+      <div style={{ display: "flex", fontSize: 24, fontWeight: 400, color: "#FFFFFF" }}>ЗАКАЗ</div>
       <div style={{ display: "flex", fontSize: 26, fontWeight: 900, color: "#FFFFFF" }}>#{orderNo}</div>
       <div style={{ display: "flex", fontSize: 20, fontWeight: 400, color: "#8A92A0" }}>({orderCode})</div>
     </div>
@@ -63,10 +63,10 @@ export async function renderOrderCard(data: CardData): Promise<Uint8Array> {
 
   const element = (
     <div style={{ display: "flex", flexDirection: "column", width: W, height: CARD_H, background: "#13161c" }}>
-      {/* Фото */}
+      {/* Фото: контейнер фиксированного размера, картинка влезает целиком (contain) без обрезки */}
       <div style={{ display: "flex", width: W, height: IMG_H, background: "#0d0f13" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={data.imageUrl} style={{ objectFit: "cover", width: "100%", height: `100%` }} />
+        <img src={data.imageUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
 
       {/* Панель текста */}
@@ -126,7 +126,7 @@ export async function renderCancelCard(data: CancelCardData): Promise<Uint8Array
     <div style={{ display: "flex", flexDirection: "column", width: W, height: CARD_H, background: "#13161c" }}>
       <div style={{ display: "flex", width: W, height: IMG_H, background: "#0d0f13", position: "relative" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={data.imageUrl} width={W} height={IMG_H} style={{ objectFit: "cover" }} />
+        <img src={data.imageUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         {/* красная плашка ОТМЕНА */}
         <div style={{ display: "flex", position: "absolute", top: 0, left: 0, right: 0, background: "#B3261E", padding: "10px 0", justifyContent: "center" }}>
           <div style={{ display: "flex", color: "#FFFFFF", fontSize: 30, fontWeight: 700 }}>❌ ОТМЕНА ЗАКАЗА</div>
