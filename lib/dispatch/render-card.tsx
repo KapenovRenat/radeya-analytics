@@ -18,7 +18,8 @@ export interface CardData {
 }
 
 const W = 600;
-const IMG_H = 460;   // фото
+const IMG_H = 306;   // фото
+const IMG_W = 400;   // фото
 const CARD_H = 800;  // 3:4 (600×800)
 
 // ── Шрифт (кириллица) — грузим Roboto TTF через Google Fonts, кешируем ────────────
@@ -46,7 +47,7 @@ function orderHeader(orderNo: string, orderCode: string) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       <div style={{ display: "flex", fontSize: 24, fontWeight: 700, color: "#FFFFFF" }}>ЗАКАЗ</div>
-      <div style={{ display: "flex", fontSize: 50, fontWeight: 900, color: "#FFFFFF" }}>#{orderNo}</div>
+      <div style={{ display: "flex", fontSize: 26, fontWeight: 900, color: "#FFFFFF" }}>#{orderNo}</div>
       <div style={{ display: "flex", fontSize: 20, fontWeight: 400, color: "#8A92A0" }}>({orderCode})</div>
     </div>
   );
@@ -65,7 +66,7 @@ export async function renderOrderCard(data: CardData): Promise<Uint8Array> {
       {/* Фото */}
       <div style={{ display: "flex", width: W, height: IMG_H, background: "#0d0f13" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={data.imageUrl} width={W} height={IMG_H} style={{ objectFit: "cover" }} />
+        <img src={data.imageUrl} style={{ objectFit: "cover", width: "100%", height: `100%` }} />
       </div>
 
       {/* Панель текста */}
