@@ -40,8 +40,9 @@ const STATUS_OPTIONS = [
   { value: "returned", label: "Возврат" },
 ];
 
-// Статусы, для которых имеет смысл слать заказ поставщику (ранние стадии)
-const DISPATCHABLE = new Set(["new", "preorder"]);
+// Статусы, для которых имеет смысл слать заказ поставщику.
+// Только предзаказ — обычные (в наличии) отгружаем сами, поставщику не шлём.
+const DISPATCHABLE = new Set(["preorder"]);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -103,7 +104,17 @@ function DetailModal({ storeId, orderId, onClose }: { storeId: string; orderId: 
     setLoading(true);
     fetch(`/api/kaspi/stores/${storeId}/orders/${orderId}`)
       .then((r) => r.json())
-      .then((d) => setData(d.error ? null : d))
+      .then((d) => {
+        setData(d.error ? null : d);
+        if (!d.error) {
+          console.groupCollapsed(`🟦 Заказ №${d.order?.orderCode} — данные от Kaspi`);
+          console.log("RAW (raw_data от Kaspi):", d.order?.rawData);
+          console.log("attributes:", (d.order?.rawData as { attributes?: unknown })?.attributes);
+          console.log("Состав заказа (entries):", d.entries);
+          console.log("Полный ответ API:", d);
+          console.groupEnd();
+        }
+      })
       .finally(() => setLoading(false));
   }, [storeId, orderId]);
 

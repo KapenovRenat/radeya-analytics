@@ -25,8 +25,8 @@ import { dispatchOrder, notifyCancellation } from "@/lib/dispatch/send-order";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Статусы, при которых шлём поставщику
-const DISPATCHABLE = new Set(["new", "preorder"]);
+// Статусы, при которых шлём поставщику. Только предзаказ — обычные (в наличии) отгружаем сами.
+const DISPATCHABLE = new Set(["preorder"]);
 // Лимиты за один тик cron (бережём лимиты Telegram + время запроса)
 const MAX_DISPATCH_PER_RUN = 5;
 const MAX_CANCEL_PER_RUN = 5;

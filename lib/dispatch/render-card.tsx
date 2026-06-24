@@ -18,12 +18,13 @@ export interface CardData {
 }
 
 const W = 600;
-const IMG_H = 560;
-const CARD_H = 980;
+const IMG_H = 460;   // фото
+const CARD_H = 800;  // 3:4 (600×800)
 
 // ── Шрифт (кириллица) — грузим Roboto TTF через Google Fonts, кешируем ────────────
 let fontRegular: ArrayBuffer | null = null;
 let fontBold: ArrayBuffer | null = null;
+let fontBlack: ArrayBuffer | null = null;
 
 async function loadWeight(weight: number): Promise<ArrayBuffer> {
   // Прямой .woff с Fontsource CDN (Satori понимает woff; woff2 — нет)
@@ -33,15 +34,27 @@ async function loadWeight(weight: number): Promise<ArrayBuffer> {
   return res.arrayBuffer();
 }
 
-async function loadFonts(): Promise<{ regular: ArrayBuffer; bold: ArrayBuffer }> {
+async function loadFonts(): Promise<{ regular: ArrayBuffer; bold: ArrayBuffer; black: ArrayBuffer }> {
   if (!fontRegular) fontRegular = await loadWeight(400);
   if (!fontBold) fontBold = await loadWeight(700);
-  return { regular: fontRegular, bold: fontBold };
+  if (!fontBlack) fontBlack = await loadWeight(900);
+  return { regular: fontRegular, bold: fontBold, black: fontBlack };
+}
+
+// Шапка «ЗАКАЗ #5916 (полный)» — крупный чёрный номер
+function orderHeader(orderNo: string, orderCode: string) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", fontSize: 24, fontWeight: 700, color: "#FFFFFF" }}>ЗАКАЗ</div>
+      <div style={{ display: "flex", fontSize: 50, fontWeight: 900, color: "#FFFFFF" }}>#{orderNo}</div>
+      <div style={{ display: "flex", fontSize: 20, fontWeight: 400, color: "#8A92A0" }}>({orderCode})</div>
+    </div>
+  );
 }
 
 // ── Рендер ────────────────────────────────────────────────────────────────────
 export async function renderOrderCard(data: CardData): Promise<Uint8Array> {
-  const { regular, bold } = await loadFonts();
+  const { regular, bold, black } = await loadFonts();
 
   const line = (children: React.ReactNode, style: React.CSSProperties = {}) => (
     <div style={{ display: "flex", color: "#E7EAF0", fontSize: 22, lineHeight: 1.35, ...style }}>{children}</div>
@@ -56,8 +69,8 @@ export async function renderOrderCard(data: CardData): Promise<Uint8Array> {
       </div>
 
       {/* Панель текста */}
-      <div style={{ display: "flex", flexDirection: "column", padding: "22px 26px", gap: 6 }}>
-        {line(`ЗАКАЗ # ${data.orderNo} (${data.orderCode})`, { fontSize: 26, fontWeight: 700, color: "#FFFFFF" })}
+      <div style={{ display: "flex", flexDirection: "column", padding: "20px 26px", gap: 6 }}>
+        {orderHeader(data.orderNo, data.orderCode)}
         {line("🚨 Каспи магазин 🚨", { fontWeight: 700, color: "#FF5A5A" })}
         {line(`Отгрузка на Zammler в г. ${data.originCity}`, { color: "#C7CCD6" })}
         {line(`Дата сдачи: ${data.handoffDate} ✅`, { fontWeight: 700, color: "#FFFFFF" })}
@@ -79,6 +92,7 @@ export async function renderOrderCard(data: CardData): Promise<Uint8Array> {
     fonts: [
       { name: "Roboto", data: regular, weight: 400, style: "normal" },
       { name: "Roboto", data: bold, weight: 700, style: "normal" },
+      { name: "Roboto", data: black, weight: 900, style: "normal" },
     ],
   });
 
@@ -97,7 +111,7 @@ export interface CancelCardData {
 }
 
 export async function renderCancelCard(data: CancelCardData): Promise<Uint8Array> {
-  const { regular, bold } = await loadFonts();
+  const { regular, bold, black } = await loadFonts();
   const typeLabel = data.type === "in_transit" ? "Отмена в пути" : "Отмена клиентом";
   const action = data.type === "in_transit"
     ? `Забрать с Zammler в г. ${data.originCity}`
@@ -118,8 +132,8 @@ export async function renderCancelCard(data: CancelCardData): Promise<Uint8Array
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", padding: "22px 26px", gap: 6 }}>
-        {line(`ЗАКАЗ # ${data.orderNo} (${data.orderCode})`, { fontSize: 26, fontWeight: 700, color: "#FFFFFF" })}
+      <div style={{ display: "flex", flexDirection: "column", padding: "20px 26px", gap: 6 }}>
+        {orderHeader(data.orderNo, data.orderCode)}
         {line(`Тип: ${typeLabel}`, { fontWeight: 700, color: "#FF7A7A" })}
         <div style={{ display: "flex", height: 12 }} />
         {line(data.displayName, { fontWeight: 700, color: "#5DCAA5" })}
@@ -135,6 +149,7 @@ export async function renderCancelCard(data: CancelCardData): Promise<Uint8Array
     fonts: [
       { name: "Roboto", data: regular, weight: 400, style: "normal" },
       { name: "Roboto", data: bold, weight: 700, style: "normal" },
+      { name: "Roboto", data: black, weight: 900, style: "normal" },
     ],
   });
   return new Uint8Array(await resp.arrayBuffer());
