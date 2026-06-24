@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
       const delayMinutes = settings?.delayMinutes ?? 60;
       const cronIntervalMin = settings?.cronIntervalMin ?? 2;
       const lastRun = settings?.lastCronRunAt ? new Date(settings.lastCronRunAt).getTime() : 0;
+      const dispatchFromAt = settings?.dispatchFromAt ? new Date(settings.dispatchFromAt) : null;
 
       if (!autoSend) { report.push({ storeId, skipped: "auto-send выключен" }); continue; }
 
@@ -89,25 +90,31 @@ export async function POST(req: NextRequest) {
       await runOrdersSync(storeId);
       await runEntriesSync(storeId);
 
-      // 4. Кандидаты: за 14 дней, возраст ≥ задержки, не терминальные
-      const cutoff = new Date(now - delayMinutes * 60_000);
-      const from14 = new Date(now - 14 * 86_400_000);
-      const candidates = await db
-        .select({
-          id: kaspiOrders.id,
-          status: kaspiOrders.status,
-          state: kaspiOrders.state,
-          waybillNumber: kaspiOrders.waybillNumber,
-          assembled: kaspiOrders.assembled,
-          preOrder: sql<string | null>`${kaspiOrders.rawData}->'attributes'->>'preOrder'`,
-          courierTx: sql<string | null>`${kaspiOrders.rawData}->'attributes'->'kaspiDelivery'->>'courierTransmissionDate'`,
-        })
-        .from(kaspiOrders)
-        .where(and(
-          eq(kaspiOrders.storeId, storeId),
-          gte(kaspiOrders.creationDate, from14),
-          lte(kaspiOrders.creationDate, cutoff), // возраст ≥ задержки
-        ));
+      // 4. Кандидаты на отправку.
+      // Нет dispatchFromAt → НИЧЕГО не шлём (только синк), чтобы не высыпать бэклог.
+      let candidates: {
+        id: string; status: string | null; state: string | null; waybillNumber: string | null;
+        assembled: boolean | null; preOrder: string | null; courierTx: string | null;
+      }[] = [];
+      const cutoff = new Date(now - delayMinutes * 60_000); // возраст ≥ задержки
+      if (dispatchFromAt) {
+        candidates = await db
+          .select({
+            id: kaspiOrders.id,
+            status: kaspiOrders.status,
+            state: kaspiOrders.state,
+            waybillNumber: kaspiOrders.waybillNumber,
+            assembled: kaspiOrders.assembled,
+            preOrder: sql<string | null>`${kaspiOrders.rawData}->'attributes'->>'preOrder'`,
+            courierTx: sql<string | null>`${kaspiOrders.rawData}->'attributes'->'kaspiDelivery'->>'courierTransmissionDate'`,
+          })
+          .from(kaspiOrders)
+          .where(and(
+            eq(kaspiOrders.storeId, storeId),
+            gte(kaspiOrders.creationDate, dispatchFromAt), // только новее точки включения
+            lte(kaspiOrders.creationDate, cutoff),         // возраст ≥ задержки
+          ));
+      }
 
       // Уже отправленные
       const dispatched = await db
@@ -156,7 +163,7 @@ export async function POST(req: NextRequest) {
         if (r.notified.length > 0) cancelNotified++;
       }
 
-      report.push({ storeId, sent, skippedNoSupplier, cancelNotified, candidates: candidates.length });
+      report.push({ storeId, sent, skippedNoSupplier, cancelNotified, candidates: candidates.length, dispatchFromAt: dispatchFromAt?.toISOString() ?? null });
     } catch (err) {
       report.push({ storeId, error: err instanceof Error ? err.message : String(err) });
     }

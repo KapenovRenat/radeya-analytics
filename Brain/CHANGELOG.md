@@ -14,6 +14,7 @@
 - ✅ Сообщение поставщику = **одна картинка** (фото товара + панель текста), рендер `next/og`/Satori (`lib/dispatch/render-card.tsx`, шрифт Roboto-cyrillic с Google Fonts рантайм, эмодзи twemoji), отправка буфером `sendTelegramPhotoBuffer`. Старый формат (фото+caption) заменён полностью.
 - ✅ Фаза 3 — cron авто-отправка: `POST /api/cron/dispatch` (защита `CRON_SECRET`), per-store gate по `cronIntervalMin`+`lastCronRunAt`, синк заказов 14д + состав (с лимитом шагов), отбор Новый/Предзаказ старше `delayMinutes` не в `order_dispatches` → `dispatchOrder`. Нет поставщика → пропуск. Crontab на VPS дёргает раз в минуту.
 - Rate-limit: ≤5 заказов и ≤5 отмен за тик cron + пауза 1.5с между сообщениями (бережём лимиты Telegram, 20 заказов уйдут порциями за ~4 мин)
+- 🐛 Фикс бэклога: первый запуск cron высыпал все заказы за 14 дней разом. Добавлен `dispatch_settings.dispatch_from_at` — cron шлёт только заказы созданные ПОСЛЕ этой точки; null → не шлёт ничего (защита). В настройках кнопка «Слать новые с этого момента».
 - ✅ Уведомления об отменах: `notifyCancellation()` — карточка-картинка об отмене поставщикам, кому уже отправляли заказ (колонка `order_dispatches.cancel_notified_at`, анти-дубль). Два типа: «Отмена в пути» (CANCELLING → «Забрать с Zammler в г. X») и «Отмена клиентом» (CANCELLED → «Складировать»). Cron детектит после синка.
 
 ## 2026-06-22

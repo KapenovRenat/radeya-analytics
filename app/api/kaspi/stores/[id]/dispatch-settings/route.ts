@@ -27,21 +27,30 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     delayMinutes: row?.delayMinutes ?? DEFAULTS.delayMinutes,
     cronIntervalMin: row?.cronIntervalMin ?? DEFAULTS.cronIntervalMin,
     dopText: row?.dopText ?? DEFAULTS.dopText,
+    dispatchFromAt: row?.dispatchFromAt ? new Date(row.dispatchFromAt).toISOString() : null,
   });
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id: storeId } = await ctx.params;
-  const body = await req.json() as Partial<typeof DEFAULTS>;
+  const body = await req.json() as Partial<typeof DEFAULTS> & { dispatchFromNow?: boolean; dispatchClear?: boolean };
+
+  const db = getDb();
+  const [existing] = await db.select().from(dispatchSettings).where(eq(dispatchSettings.storeId, storeId)).limit(1);
+
+  // dispatchFromAt: only changes on explicit request, иначе сохраняем текущее
+  let dispatchFromAt = existing?.dispatchFromAt ?? null;
+  if (body.dispatchFromNow) dispatchFromAt = new Date();
+  else if (body.dispatchClear) dispatchFromAt = null;
 
   const values = {
     autoSendEnabled: body.autoSendEnabled ?? DEFAULTS.autoSendEnabled,
     delayMinutes: Math.max(0, Math.floor(Number(body.delayMinutes ?? DEFAULTS.delayMinutes))),
     cronIntervalMin: Math.max(1, Math.floor(Number(body.cronIntervalMin ?? DEFAULTS.cronIntervalMin))),
     dopText: (body.dopText ?? DEFAULTS.dopText).trim() || DEFAULTS.dopText,
+    dispatchFromAt,
   };
 
-  const db = getDb();
   await db
     .insert(dispatchSettings)
     .values({ storeId, ...values })

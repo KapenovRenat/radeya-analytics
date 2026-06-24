@@ -360,6 +360,8 @@ function DispatchSettingsModal({ storeId, onClose }: { storeId: string; onClose:
   const [minutes, setMinutes] = useState(0);
   const [cronInterval, setCronInterval] = useState(2);
   const [dopText, setDopText] = useState("");
+  const [dispatchFromAt, setDispatchFromAt] = useState<string | null>(null);
+  const [dispatchAction, setDispatchAction] = useState<"none" | "now" | "clear">("none");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -373,6 +375,7 @@ function DispatchSettingsModal({ storeId, onClose }: { storeId: string; onClose:
         setMinutes((d.delayMinutes ?? 60) % 60);
         setCronInterval(d.cronIntervalMin ?? 2);
         setDopText(d.dopText ?? "");
+        setDispatchFromAt(d.dispatchFromAt ?? null);
       })
       .finally(() => setLoading(false));
   }, [storeId]);
@@ -394,8 +397,14 @@ function DispatchSettingsModal({ storeId, onClose }: { storeId: string; onClose:
           delayMinutes: hours * 60 + minutes,
           cronIntervalMin: cronInterval,
           dopText,
+          dispatchFromNow: dispatchAction === "now",
+          dispatchClear: dispatchAction === "clear",
         }),
       });
+      // обновим отображение
+      const r = await fetch(`/api/kaspi/stores/${storeId}/dispatch-settings`).then((x) => x.json());
+      setDispatchFromAt(r.dispatchFromAt ?? null);
+      setDispatchAction("none");
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     } finally {
@@ -421,6 +430,33 @@ function DispatchSettingsModal({ storeId, onClose }: { storeId: string; onClose:
               </span>
               <span className="text-[12px] text-[var(--text)]">Авто-отправка (cron) включена</span>
             </label>
+
+            {/* Слать только новые с момента включения — защита от бэклога */}
+            <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-elev)] p-3">
+              <p className="text-[11px] font-medium text-[var(--text-dim)]">Авто-отправка только новых заказов</p>
+              <p className="mt-1 text-[11px] text-[var(--text)]">
+                {dispatchAction === "now"
+                  ? <span className="text-[var(--accent)]">→ будет включено с текущего момента (после сохранения)</span>
+                  : dispatchAction === "clear"
+                  ? <span className="text-[var(--red)]">→ авто-отправка новых будет выключена</span>
+                  : dispatchFromAt
+                  ? <>Шлём заказы новее: <b>{fmtDateTime(dispatchFromAt)}</b></>
+                  : <span className="text-[var(--amber)]">Выключено — cron не отправляет (защита от бэклога)</span>}
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button onClick={() => setDispatchAction("now")}
+                  className="rounded border border-[var(--border-strong)] px-2.5 py-1 text-[11px] font-medium text-[var(--text)] hover:border-[var(--accent)] hover:text-[var(--accent)]">
+                  Слать новые с этого момента
+                </button>
+                {dispatchFromAt && (
+                  <button onClick={() => setDispatchAction("clear")}
+                    className="rounded border border-[var(--border-strong)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-dim)] hover:border-[var(--red)] hover:text-[var(--red)]">
+                    Выключить
+                  </button>
+                )}
+              </div>
+              <p className="mt-1.5 text-[10px] text-[var(--text-subtle)]">cron отправит только заказы, созданные позже этого момента. Старые (бэклог) не уйдут.</p>
+            </div>
 
             <div>
               <label className="mb-1 block text-[11px] font-medium text-[var(--text-dim)]">Задержка перед отправкой</label>

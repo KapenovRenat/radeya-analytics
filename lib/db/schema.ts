@@ -492,6 +492,9 @@ export const dispatchSettings = pgTable("dispatch_settings", {
   delayMinutes: integer("delay_minutes").notNull().default(60),     // задержка перед отправкой
   cronIntervalMin: integer("cron_interval_min").notNull().default(2), // интервал опроса
   dopText: text("dop_text").notNull().default("‼️ Паспорт приложить. Шильдик Radeya"),
+  // Слать только заказы, созданные ПОСЛЕ этой даты (отсекает бэклог).
+  // null → cron ничего не отправляет (безопасно), пока владелец не нажмёт «слать новые с этого момента».
+  dispatchFromAt: timestamp("dispatch_from_at", { withTimezone: true }),
   lastCronRunAt: timestamp("last_cron_run_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
