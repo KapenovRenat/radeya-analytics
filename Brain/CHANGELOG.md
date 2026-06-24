@@ -11,7 +11,10 @@
 - Дата сдачи в сообщении = `plannedDeliveryDate` − дни склада (по городу отгрузки `originAddressCity`)
 - Заглушка картинки через `DEFAULT_PRODUCT_IMAGE_URL`
 - 📌 TODO: мультисклад (товар на 2+ складах — проверить матч города); настоящая «дата прибытия» из waybill Kaspi (доп. интеграция)
-- ⏳ Осталось: **Фаза 3 — cron авто-отправка**
+- ✅ Сообщение поставщику = **одна картинка** (фото товара + панель текста), рендер `next/og`/Satori (`lib/dispatch/render-card.tsx`, шрифт Roboto-cyrillic с Google Fonts рантайм, эмодзи twemoji), отправка буфером `sendTelegramPhotoBuffer`. Старый формат (фото+caption) заменён полностью.
+- ✅ Фаза 3 — cron авто-отправка: `POST /api/cron/dispatch` (защита `CRON_SECRET`), per-store gate по `cronIntervalMin`+`lastCronRunAt`, синк заказов 14д + состав (с лимитом шагов), отбор Новый/Предзаказ старше `delayMinutes` не в `order_dispatches` → `dispatchOrder`. Нет поставщика → пропуск. Crontab на VPS дёргает раз в минуту.
+- Rate-limit: ≤5 заказов и ≤5 отмен за тик cron + пауза 1.5с между сообщениями (бережём лимиты Telegram, 20 заказов уйдут порциями за ~4 мин)
+- ✅ Уведомления об отменах: `notifyCancellation()` — карточка-картинка об отмене поставщикам, кому уже отправляли заказ (колонка `order_dispatches.cancel_notified_at`, анти-дубль). Два типа: «Отмена в пути» (CANCELLING → «Забрать с Zammler в г. X») и «Отмена клиентом» (CANCELLED → «Складировать»). Cron детектит после синка.
 
 ## 2026-06-22
 

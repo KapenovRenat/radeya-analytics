@@ -14,7 +14,11 @@ import {
   dispatchSettings, orderDispatches,
 } from "@/lib/db/schema";
 import { parseProductName } from "@/lib/products/parse-name";
-import { sendTelegramPhoto } from "@/lib/telegram";
+import { sendTelegramPhotoBuffer } from "@/lib/telegram";
+import { renderOrderCard, renderCancelCard } from "@/lib/dispatch/render-card";
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const SEND_DELAY_MS = 1500; // пауза между сообщениями — бережём лимиты Telegram
 
 const DEFAULT_DOP = "‼️ Паспорт приложить. Шильдик Radeya";
 // Заглушка-картинка для товаров без своего фото.
@@ -31,10 +35,6 @@ export interface DispatchResult {
   skipped: { reason: string; detail: string }[];
   alreadyDispatched: string[]; // имена поставщиков, уже отправленных ранее
   error?: string;
-}
-
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 interface MatchedItem {
@@ -159,22 +159,29 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
 
     if (claimed.length === 0) { alreadyDispatched.push(supplierName); continue; }
 
-    // Отправляем каждую позицию отдельным фото-сообщением
+    // Рендерим каждую позицию в карточку-картинку и шлём как одно фото
     let okCount = 0;
     let lastErr = "";
     for (const it of items) {
-      const caption =
-        `<b>ЗАКАЗ # ${esc(orderNo)} (${esc(order.orderCode)})</b>\n` +
-        `🚨 <b>Каспи магазин</b> 🚨\n` +
-        `Отгрузка на Zammler в г. ${esc(originCity)}\n` +
-        `<b>Дата сдачи: ${esc(it.handoffDate)}</b> ✅\n\n` +
-        `${esc(it.displayName)}\n` +
-        `Основная ткань: ${esc(it.fabric ?? "—")}\n` +
-        `Артикул изделия: ${esc(it.code ?? "—")}\n` +
-        `Доп: ${esc(dopText)}`;
-      const r = await sendTelegramPhoto(botToken, it.chatId, it.imageUrl!, caption);
-      if (r.ok) okCount++;
-      else lastErr = r.error ?? "ошибка";
+      try {
+        const png = await renderOrderCard({
+          imageUrl: it.imageUrl!,
+          orderNo,
+          orderCode: order.orderCode,
+          originCity,
+          handoffDate: it.handoffDate,
+          displayName: it.displayName,
+          fabric: it.fabric,
+          code: it.code,
+          dopText,
+        });
+        const r = await sendTelegramPhotoBuffer(botToken, it.chatId, png);
+        if (r.ok) okCount++;
+        else lastErr = r.error ?? "ошибка";
+      } catch (err) {
+        lastErr = err instanceof Error ? err.message : String(err);
+      }
+      await sleep(SEND_DELAY_MS);
     }
 
     if (okCount > 0) {
@@ -197,4 +204,94 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
     skipped,
     alreadyDispatched,
   };
+}
+
+// ── Уведомление об отмене ─────────────────────────────────────────────────────
+/**
+ * Уведомить поставщиков об отмене заказа (картинкой). Только тех, кому уже
+ * отправляли заказ (есть строка order_dispatches) и кого ещё не уведомляли.
+ * type: "in_transit" (отмена в пути) | "by_customer" (отмена клиентом).
+ */
+export async function notifyCancellation(
+  storeId: string,
+  orderId: string,
+  type: "in_transit" | "by_customer",
+): Promise<{ ok: boolean; notified: string[]; error?: string }> {
+  const db = getDb();
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!botToken) return { ok: false, notified: [], error: "TELEGRAM_BOT_TOKEN не задан" };
+
+  const [order] = await db
+    .select({ orderCode: kaspiOrders.orderCode, originCity: kaspiOrders.originAddressCity })
+    .from(kaspiOrders)
+    .where(and(eq(kaspiOrders.id, orderId), eq(kaspiOrders.storeId, storeId)))
+    .limit(1);
+  if (!order) return { ok: false, notified: [], error: "Заказ не найден" };
+
+  // Поставщики, кому отправляли заказ и кого ещё не уведомляли об отмене
+  const targets = await db
+    .select({ supplierName: orderDispatches.supplierName, cancelNotifiedAt: orderDispatches.cancelNotifiedAt })
+    .from(orderDispatches)
+    .where(eq(orderDispatches.orderId, orderId));
+  const toNotify = targets.filter((t) => !t.cancelNotifiedAt).map((t) => t.supplierName);
+  if (toNotify.length === 0) return { ok: true, notified: [] };
+
+  const orderNo = order.orderCode.slice(-4);
+  const originCity = order.originCity ?? "—";
+
+  // Контакты + позиции
+  const supplierRows = await db
+    .select({ name: suppliers.name, tgChatId: suppliers.tgChatId, tgGroupId: suppliers.tgGroupId })
+    .from(suppliers)
+    .where(eq(suppliers.storeId, storeId));
+  const supplierMap = new Map(supplierRows.map((s) => [s.name, s]));
+
+  const entries = await db
+    .select({ offerCode: kaspiOrderEntries.offerCode })
+    .from(kaspiOrderEntries)
+    .where(eq(kaspiOrderEntries.orderId, orderId));
+
+  // позиции по поставщику (для уведомляемых)
+  const bySupplier = new Map<string, { chatId: string; displayName: string; code: string | null; imageUrl: string }[]>();
+  for (const e of entries) {
+    if (!e.offerCode) continue;
+    const [prod] = await db
+      .select({ name: products.name, code: products.code, supplier: products.supplier, imageUrl: products.imageUrl })
+      .from(products)
+      .where(and(eq(products.storeId, storeId), eq(products.code, e.offerCode)))
+      .limit(1);
+    if (!prod?.supplier || !toNotify.includes(prod.supplier)) continue;
+    const sup = supplierMap.get(prod.supplier);
+    const chatId = sup?.tgGroupId || sup?.tgChatId;
+    if (!chatId) continue;
+    const imageUrl = prod.imageUrl || DEFAULT_IMAGE;
+    if (!imageUrl) continue;
+    const parsed = parseProductName(prod.name);
+    if (!bySupplier.has(prod.supplier)) bySupplier.set(prod.supplier, []);
+    bySupplier.get(prod.supplier)!.push({ chatId, displayName: parsed.displayName, code: prod.code, imageUrl });
+  }
+
+  const notified: string[] = [];
+  for (const [supplierName, items] of bySupplier) {
+    let okCount = 0;
+    for (const it of items) {
+      try {
+        const png = await renderCancelCard({
+          imageUrl: it.imageUrl, orderNo, orderCode: order.orderCode, type, originCity,
+          displayName: it.displayName, code: it.code,
+        });
+        const r = await sendTelegramPhotoBuffer(botToken, it.chatId, png);
+        if (r.ok) okCount++;
+      } catch { /* ignore single item */ }
+      await sleep(SEND_DELAY_MS);
+    }
+    if (okCount > 0) {
+      await db.update(orderDispatches)
+        .set({ cancelNotifiedAt: new Date() })
+        .where(and(eq(orderDispatches.orderId, orderId), eq(orderDispatches.supplierName, supplierName)));
+      notified.push(supplierName);
+    }
+  }
+
+  return { ok: true, notified };
 }

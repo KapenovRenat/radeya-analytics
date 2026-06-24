@@ -519,6 +519,7 @@ export const orderDispatches = pgTable(
     status: text("status").notNull().default("sent"), // sent | failed
     error: text("error"),
     sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    cancelNotifiedAt: timestamp("cancel_notified_at", { withTimezone: true }), // уведомили об отмене
   },
   (t) => [
     uniqueIndex("uq_order_dispatches").on(t.orderId, t.supplierName),
