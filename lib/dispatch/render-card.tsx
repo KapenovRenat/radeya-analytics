@@ -15,6 +15,13 @@ export interface CardData {
   fabric: string | null;
   code: string | null;
   dopText: string;
+  // variant=delivery — карточка для газелиста (своя доставка): адрес+телефон клиента вместо Zammler
+  variant?: "shipment" | "delivery";
+  customerAddress?: string | null;
+  customerPhone?: string | null;
+  deliveryDate?: string; // дата доставки клиенту (для газелиста)
+  // фон карточки по типу: предзаказ → тёмно-красный, наличие → тёмно-зелёный
+  isPreorder?: boolean;
 }
 
 const W = 600;
@@ -47,7 +54,7 @@ function orderHeader(orderNo: string, orderCode: string) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       <div style={{ display: "flex", fontSize: 24, fontWeight: 400, color: "#FFFFFF" }}>ЗАКАЗ</div>
-      <div style={{ display: "flex", fontSize: 26, fontWeight: 900, color: "#FFFFFF" }}>#{orderNo}</div>
+      <div style={{ display: "flex", fontSize: 32, fontWeight: 900, color: "#FFFFFF" }}>#{orderNo}</div>
       <div style={{ display: "flex", fontSize: 20, fontWeight: 400, color: "#8A92A0" }}>({orderCode})</div>
     </div>
   );
@@ -57,14 +64,18 @@ function orderHeader(orderNo: string, orderCode: string) {
 export async function renderOrderCard(data: CardData): Promise<Uint8Array> {
   const { regular, bold, black } = await loadFonts();
 
+  // Фон по типу заказа: предзаказ → тёмно-красный, наличие → тёмно-зелёный
+  const cardBg = data.isPreorder ? "#2b1116" : "#0f221a";
+  const photoBg = data.isPreorder ? "#1c0c10" : "#0a1712";
+
   const line = (children: React.ReactNode, style: React.CSSProperties = {}) => (
     <div style={{ display: "flex", color: "#E7EAF0", fontSize: 22, lineHeight: 1.35, ...style }}>{children}</div>
   );
 
   const element = (
-    <div style={{ display: "flex", flexDirection: "column", width: W, height: CARD_H, background: "#13161c" }}>
+    <div style={{ display: "flex", flexDirection: "column", width: W, height: CARD_H, background: cardBg }}>
       {/* Фото: контейнер фиксированного размера, картинка влезает целиком (contain) без обрезки */}
-      <div style={{ display: "flex", width: W, height: IMG_H, background: "#0d0f13" }}>
+      <div style={{ display: "flex", width: W, height: IMG_H, background: photoBg }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={data.imageUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
@@ -73,15 +84,27 @@ export async function renderOrderCard(data: CardData): Promise<Uint8Array> {
       <div style={{ display: "flex", flexDirection: "column", padding: "20px 26px", gap: 6 }}>
         {orderHeader(data.orderNo, data.orderCode)}
         {line("🚨 Каспи магазин 🚨", { fontWeight: 700, color: "#FF5A5A" })}
-        {line(`Отгрузка на Zammler в г. ${data.originCity}`, { color: "#C7CCD6" })}
-        {line(`Дата сдачи: ${data.handoffDate} ✅`, { fontWeight: 700, color: "#FFFFFF" })}
+
+        {data.variant === "delivery" ? (
+          <>
+            {line("🚚 Доставка по городу", { color: "#C7CCD6", fontSize: 22, fontWeight: 800 })}
+            {line(`Адрес: ${data.customerAddress ?? "—"}`, { color: "#FFFFFF", fontWeight: 700 })}
+            {line(`Тел: ${data.customerPhone ?? "—"}`, { color: "#C7CCD6" })}
+            {data.deliveryDate ? line(`Дата доставки: ${data.deliveryDate} ✅`, { fontWeight: 700, color: "#FFFFFF" }) : null}
+          </>
+        ) : (
+          <>
+            {line(`Отгрузка на Zammler в г. ${data.originCity}`, { color: "#C7CCD6", fontSize: 32, fontWeight: 900 })}
+            {line(`Дата сдачи: ${data.handoffDate} ✅`, { fontWeight: 700, color: "#FFFFFF" })}
+          </>
+        )}
 
         <div style={{ display: "flex", height: 12 }} />
 
         {line(data.displayName, { fontWeight: 700, color: "#5DCAA5" })}
         {line(`Основная ткань: ${data.fabric ?? "—"}`, { color: "#C7CCD6" })}
-        {line(`Артикул изделия: ${data.code ?? "—"}`, { color: "#C7CCD6" })}
-        {line(`Доп: ${data.dopText}`, { color: "#C7CCD6" })}
+        {line(`Артикул изделия: ${data.code ?? "—"}`, { color: "#C7CCD6", fontSize: 32, fontWeight: 900 })}
+        {/*{line(`Доп: ${data.dopText}`, { color: "#C7CCD6" })}*/}
       </div>
     </div>
   );

@@ -43,6 +43,8 @@ function whSummary(p: Product): { city: string; days: number }[] {
 
 interface SupplierRow {
   name: string;
+  role: string;          // supplier | warehouse | local_delivery
+  city: string | null;
   productCount: number;
   tgChatId: string | null;
   tgGroupId: string | null;
@@ -304,8 +306,15 @@ function SuppliersModal({ storeId, onClose }: { storeId: string; onClose: () => 
                 )}
                 {filtered.map((s) => (
                   <tr key={s.name} className="border-b border-[var(--border)] hover:bg-white/[0.02] cursor-pointer" onClick={() => openEdit(s)}>
-                    <td className="px-4 py-2.5 text-[var(--text)] max-w-[340px]"><span className="line-clamp-1">{s.name}</span></td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-[var(--text-dim)]">{s.productCount}</td>
+                    <td className="px-4 py-2.5 text-[var(--text)] max-w-[340px]">
+                      <span className="line-clamp-1">{s.name}</span>
+                      {s.role !== "supplier" && (
+                        <span className="ml-1 inline-block rounded-full bg-[#4a3424]/40 px-1.5 py-0.5 text-[9px] font-medium text-[#c79a6b] align-middle">
+                          {s.role === "warehouse" ? "склад" : "своя доставка"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-[var(--text-dim)]">{s.role === "supplier" ? s.productCount : "—"}</td>
                     <td className="px-3 py-2.5 text-center">
                       {s.tgChatId ? <Check className="mx-auto h-4 w-4 text-[var(--emerald)]" /> : <span className="text-[var(--text-subtle)]">—</span>}
                     </td>

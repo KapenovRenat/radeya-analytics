@@ -20,29 +20,34 @@ interface OrderRow {
   totalPrice: number;
   statusKey: string;
   statusLabel: string;
-  statusTone: "default" | "amber" | "emerald" | "red" | "blue" | "violet" | "orange" | "kaspi";
+  statusTone: "default" | "amber" | "emerald" | "red" | "blue" | "violet" | "orange" | "kaspi" | "brown";
   state: string;
   customerName: string | null;
   city: string | null;
   dispatched: boolean;
+  canDispatch: boolean;
 }
 
 const STATUS_OPTIONS = [
   { value: "", label: "Все статусы" },
   { value: "new", label: "Новый" },
+  { value: "signing", label: "На подписании" },
   { value: "preorder", label: "Предзаказ" },
   { value: "packing", label: "Упаковка" },
   { value: "transfer", label: "Передача" },
   { value: "on_delivery", label: "Переданы на доставку" },
-  { value: "cancelled_delivery", label: "Отменены при доставке" },
-  { value: "completed", label: "Завершён" },
+  { value: "pickup", label: "Самовывоз" },
+  { value: "own_delivery", label: "Своя доставка" },
+  { value: "cancelled_delivery", label: "Ожидают возврата/отмены" },
+  { value: "return_pending", label: "Ожидают решения по возврату" },
+  { value: "completed", label: "Доставлен" },
   { value: "cancelled", label: "Отменён" },
   { value: "returned", label: "Возврат" },
 ];
 
-// Статусы, для которых имеет смысл слать заказ поставщику.
-// Только предзаказ — обычные (в наличии) отгружаем сами, поставщику не шлём.
-const DISPATCHABLE = new Set(["preorder"]);
+// Статусы, для которых можно отправить заказ получателю:
+//   preorder → поставщику; packing → Кладовщику; own_delivery → своей доставке.
+const DISPATCHABLE = new Set(["preorder", "packing", "own_delivery"]);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -216,6 +221,7 @@ interface PreviewItem {
 function DispatchPreviewModal({ storeId, orderId, orderCode, onClose, onSent }: { storeId: string; orderId: string; orderCode: string; onClose: () => void; onSent: () => void }) {
   const [items, setItems] = useState<PreviewItem[]>([]);
   const [originCity, setOriginCity] = useState<string | null>(null);
+  const [route, setRoute] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ ok: boolean; sentSuppliers: { supplier: string; items: number }[]; skipped: { reason: string; detail: string }[]; error?: string } | null>(null);
@@ -224,7 +230,7 @@ function DispatchPreviewModal({ storeId, orderId, orderCode, onClose, onSent }: 
     setLoading(true);
     fetch(`/api/kaspi/stores/${storeId}/orders/${orderId}/dispatch-preview`)
       .then((r) => r.json())
-      .then((d) => { setItems(d.items ?? []); setOriginCity(d.originCity ?? null); })
+      .then((d) => { setItems(d.items ?? []); setOriginCity(d.originCity ?? null); setRoute(d.route ?? null); })
       .finally(() => setLoading(false));
   }, [storeId, orderId]);
 
@@ -263,6 +269,7 @@ function DispatchPreviewModal({ storeId, orderId, orderCode, onClose, onSent }: 
             <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">
               Проверка матчинга (пока не отправляет) · отгрузка {originCity ?? "—"}
             </p>
+            {route && <p className="mt-0.5 text-[11px] font-medium text-[var(--accent)]">{route}</p>}
           </div>
           <button onClick={onClose} className="rounded p-1.5 text-[var(--text-dim)] hover:bg-white/10"><X className="h-4 w-4" /></button>
         </div>
@@ -303,9 +310,9 @@ function DispatchPreviewModal({ storeId, orderId, orderCode, onClose, onSent }: 
                         <div className="min-w-0 flex-1 text-[11px]">
                           <p className="font-medium text-[var(--text)]">{it.matched.displayName}</p>
                           {it.matched.fabric && <p className="text-[var(--text-dim)]">Ткань: {it.matched.fabric}</p>}
-                          <p className="text-[var(--text-dim)]">Поставщик: {it.matched.supplier ?? "—"}</p>
+                          <p className="text-[var(--text-dim)]">Получатель: {it.matched.supplier ?? "—"}</p>
                           <p className={it.matched.hasContact ? "text-[var(--emerald)]" : "text-[var(--red)]"}>
-                            {it.matched.hasContact ? `✓ контакт: ${it.matched.target}` : "✕ нет контакта поставщика"}
+                            {it.matched.hasContact ? `✓ контакт: ${it.matched.target}` : "✕ нет контакта получателя"}
                           </p>
                           {!it.matched.imageUrl && <p className="text-[var(--amber)]">⚠ нет своей картинки — будет заглушка</p>}
                         </div>
@@ -667,13 +674,13 @@ export function OrdersTable({ storeId }: { storeId: string }) {
                           <RotateCcw className="h-3 w-3" />
                         </button>
                       </span>
-                    ) : DISPATCHABLE.has(o.statusKey) && (
+                    ) : DISPATCHABLE.has(o.statusKey) && o.canDispatch && (
                       <button
                         onClick={() => setDispatchOrder({ id: o.id, code: o.orderCode })}
-                        title="Отправить поставщику"
+                        title="Отправить получателю"
                         className="inline-flex items-center gap-1 rounded border border-[var(--border-strong)] px-2 py-1 text-[10px] font-medium text-[var(--text-dim)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
                       >
-                        <Send className="h-3 w-3" /> Поставщику
+                        <Send className="h-3 w-3" /> Отправить
                       </button>
                     )}
                   </div>

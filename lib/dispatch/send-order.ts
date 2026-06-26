@@ -16,9 +16,18 @@ import {
 import { parseProductName } from "@/lib/products/parse-name";
 import { sendTelegramPhotoBuffer } from "@/lib/telegram";
 import { renderOrderCard, renderCancelCard } from "@/lib/dispatch/render-card";
+import { deliveryType } from "@/lib/kaspi/order-status";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const SEND_DELAY_MS = 1500; // пауза между сообщениями — бережём лимиты Telegram
+
+/** Город получателя совпадает с городом заказа (нестрого, регистронезависимо). */
+function cityMatch(recipientCity: string | null, orderCity: string | null): boolean {
+  if (!recipientCity || !orderCity) return false;
+  const a = recipientCity.toLowerCase().trim();
+  const b = orderCity.toLowerCase().trim();
+  return b.includes(a) || a.includes(b);
+}
 
 const DEFAULT_DOP = "‼️ Паспорт приложить. Шильдик Radeya";
 // Заглушка-картинка для товаров без своего фото.
@@ -57,16 +66,55 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
   }
 
   const [order] = await db
-    .select({ orderCode: kaspiOrders.orderCode, originCity: kaspiOrders.originAddressCity, rawData: kaspiOrders.rawData })
+    .select({
+      orderCode: kaspiOrders.orderCode,
+      status: kaspiOrders.status,
+      state: kaspiOrders.state,
+      deliveryMode: kaspiOrders.deliveryMode,
+      isKaspiDelivery: kaspiOrders.isKaspiDelivery,
+      originCity: kaspiOrders.originAddressCity,
+      deliveryCity: kaspiOrders.deliveryAddressCity,
+      deliveryAddress: kaspiOrders.deliveryAddressFormatted,
+      customerPhone: kaspiOrders.customerCellPhone,
+      rawData: kaspiOrders.rawData,
+    })
     .from(kaspiOrders)
     .where(and(eq(kaspiOrders.id, orderId), eq(kaspiOrders.storeId, storeId)))
     .limit(1);
   if (!order) return { ok: false, orderCode: "", sentSuppliers: [], skipped: [], alreadyDispatched: [], error: "Заказ не найден" };
 
-  const attrs = (order.rawData as { attributes?: { plannedDeliveryDate?: number | null } } | null)?.attributes;
+  const attrs = (order.rawData as { attributes?: { plannedDeliveryDate?: number | null; preOrder?: boolean } } | null)?.attributes;
   const plannedDeliveryMs = attrs?.plannedDeliveryDate ?? null; // планируемая дата доставки заказа
   const orderNo = order.orderCode.slice(-4);
   const originCity = order.originCity ?? "—";
+  const preOrder = attrs?.preOrder === true;
+
+  // ── Маршрут: предзаказ → реальный поставщик; наличие → внутренний получатель по типу доставки ──
+  const dtype = deliveryType({ state: order.state, deliveryMode: order.deliveryMode, isKaspiDelivery: order.isKaspiDelivery });
+  const mode: "supplier" | "warehouse" | "local_delivery" | null =
+    preOrder ? "supplier" : dtype === "kaspi" ? "warehouse" : dtype === "own" ? "local_delivery" : null;
+  if (!mode) {
+    return { ok: false, orderCode: order.orderCode, sentSuppliers: [], skipped: [{ reason: "Не подлежит отправке", detail: `тип доставки: ${dtype}` }], alreadyDispatched: [] };
+  }
+
+  // Для наличия — один внутренний получатель на весь заказ (по роли + городу)
+  let internalRecipient: { name: string; chatId: string; isGroup: boolean } | null = null;
+  if (mode !== "supplier") {
+    const matchCity = mode === "warehouse" ? order.originCity : order.deliveryCity;
+    const recips = await db
+      .select({ name: suppliers.name, city: suppliers.city, tgChatId: suppliers.tgChatId, tgGroupId: suppliers.tgGroupId })
+      .from(suppliers)
+      .where(and(eq(suppliers.storeId, storeId), eq(suppliers.role, mode)));
+    const rec = recips.find((r) => cityMatch(r.city, matchCity)) ?? null;
+    if (!rec) {
+      return { ok: false, orderCode: order.orderCode, sentSuppliers: [], skipped: [{ reason: "Нет внутреннего получателя для города", detail: matchCity ?? "—" }], alreadyDispatched: [] };
+    }
+    const chatId = rec.tgGroupId || rec.tgChatId;
+    if (!chatId) {
+      return { ok: false, orderCode: order.orderCode, sentSuppliers: [], skipped: [{ reason: "У получателя не указан Telegram", detail: rec.name }], alreadyDispatched: [] };
+    }
+    internalRecipient = { name: rec.name, chatId, isGroup: !!rec.tgGroupId };
+  }
 
   // Дни склада по городу отгрузки заказа
   const whDaysForCity = (prod: {
@@ -88,6 +136,11 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
     const ms = plannedDeliveryMs - whDays * 86_400_000;
     return new Date(ms).toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Asia/Almaty" });
   };
+
+  // Дата доставки клиенту (для газелиста) = плановая дата доставки заказа
+  const deliveryDateStr = plannedDeliveryMs
+    ? new Date(plannedDeliveryMs).toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Asia/Almaty" })
+    : "—";
 
   const [settings] = await db.select().from(dispatchSettings).where(eq(dispatchSettings.storeId, storeId)).limit(1);
   const dopText = settings?.dopText?.trim() || DEFAULT_DOP;
@@ -119,21 +172,29 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
       .where(and(eq(products.storeId, storeId), eq(products.code, e.offerCode)))
       .limit(1);
     if (!prod) { skipped.push({ reason: "Товар не найден", detail: e.offerCode }); continue; }
-    if (!prod.supplier) { skipped.push({ reason: "У товара нет поставщика", detail: prod.name }); continue; }
-    const sup = supplierMap.get(prod.supplier);
-    const chatId = sup?.tgGroupId || sup?.tgChatId;
-    if (!chatId) { skipped.push({ reason: "Нет контакта поставщика", detail: prod.supplier }); continue; }
+
+    // Кому уходит эта позиция: поставщик товара (предзаказ) или внутренний получатель (наличие)
+    let recipientName: string, chatId: string, isGroup: boolean;
+    if (mode === "supplier") {
+      if (!prod.supplier) { skipped.push({ reason: "У товара нет поставщика", detail: prod.name }); continue; }
+      const sup = supplierMap.get(prod.supplier);
+      const cid = sup?.tgGroupId || sup?.tgChatId;
+      if (!cid) { skipped.push({ reason: "Нет контакта поставщика", detail: prod.supplier }); continue; }
+      recipientName = prod.supplier; chatId = cid; isGroup = !!sup?.tgGroupId;
+    } else {
+      recipientName = internalRecipient!.name; chatId = internalRecipient!.chatId; isGroup = internalRecipient!.isGroup;
+    }
 
     // Картинка: своя из базы, иначе дефолтная заглушка (public/no-image.png)
     const imageUrl = prod.imageUrl || DEFAULT_IMAGE;
     if (!imageUrl) { skipped.push({ reason: "Нет картинки и не задан PUBLIC_BASE_URL для заглушки", detail: prod.name }); continue; }
 
     const parsed = parseProductName(prod.name);
-    if (!bySupplier.has(prod.supplier)) bySupplier.set(prod.supplier, []);
-    bySupplier.get(prod.supplier)!.push({
-      supplier: prod.supplier,
+    if (!bySupplier.has(recipientName)) bySupplier.set(recipientName, []);
+    bySupplier.get(recipientName)!.push({
+      supplier: recipientName,
       chatId,
-      isGroup: !!sup?.tgGroupId,
+      isGroup,
       displayName: parsed.displayName,
       fabric: parsed.fabric,
       code: prod.code,
@@ -174,6 +235,13 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
           fabric: it.fabric,
           code: it.code,
           dopText,
+          // газелист (своя доставка) → карточка с адресом+телефоном клиента
+          variant: mode === "local_delivery" ? "delivery" : "shipment",
+          customerAddress: order.deliveryAddress,
+          customerPhone: order.customerPhone,
+          deliveryDate: deliveryDateStr,
+          // фон: предзаказ → красный, наличие → зелёный
+          isPreorder: preOrder,
         });
         const r = await sendTelegramPhotoBuffer(botToken, it.chatId, png);
         if (r.ok) okCount++;

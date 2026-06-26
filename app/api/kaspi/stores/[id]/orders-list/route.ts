@@ -9,14 +9,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and, or, ilike, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, ilike, desc, sql, inArray, isNotNull } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { kaspiOrders, orderDispatches } from "@/lib/db/schema";
+import { kaspiOrders, orderDispatches, kaspiOrderEntries, products, suppliers } from "@/lib/db/schema";
 import { mapOrderStatus, mapOrderState } from "@/lib/kaspi/order-status";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 20;
+
+/** Город получателя совпадает с городом заказа (нестрого, регистронезависимо). */
+function cityMatch(recipientCity: string | null, orderCity: string | null): boolean {
+  if (!recipientCity || !orderCity) return false;
+  const a = recipientCity.toLowerCase().trim();
+  const b = orderCity.toLowerCase().trim();
+  return b.includes(a) || a.includes(b);
+}
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id: storeId } = await ctx.params;
@@ -51,9 +59,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       state: kaspiOrders.state,
       waybillNumber: kaspiOrders.waybillNumber,
       isKaspiDelivery: kaspiOrders.isKaspiDelivery,
+      deliveryMode: kaspiOrders.deliveryMode,
       assembled: kaspiOrders.assembled,
       customerName: kaspiOrders.customerName,
       deliveryAddressCity: kaspiOrders.deliveryAddressCity,
+      originAddressCity: kaspiOrders.originAddressCity,
       preOrder: sql<string | null>`${kaspiOrders.rawData}->'attributes'->>'preOrder'`,
       courierTx: sql<string | null>`${kaspiOrders.rawData}->'attributes'->'kaspiDelivery'->>'courierTransmissionDate'`,
     })
@@ -71,6 +81,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       preOrder: o.preOrder === "true",
       assembled: o.assembled ?? false,
       courierTransmitted: !!o.courierTx,
+      deliveryMode: o.deliveryMode,
+      isKaspiDelivery: o.isKaspiDelivery,
     });
     return {
       id: o.id,
@@ -83,7 +95,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       state: mapOrderState(o.state, o.isKaspiDelivery),
       customerName: o.customerName,
       city: o.deliveryAddressCity,
+      originCity: o.originAddressCity,
       dispatched: false,
+      canDispatch: false,
     };
   });
 
@@ -109,6 +123,40 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       mapped = mapped.map((m) => ({ ...m, dispatched: dispatchedSet.has(m.id) }));
     } catch {
       /* таблица ещё не создана / ошибка — оставляем dispatched=false */
+    }
+  }
+
+  // canDispatch — есть ли реальный получатель с Telegram-контактом под маршрут этого заказа
+  if (ids.length > 0) {
+    try {
+      const recips = await db
+        .select({ role: suppliers.role, city: suppliers.city, tgChatId: suppliers.tgChatId, tgGroupId: suppliers.tgGroupId })
+        .from(suppliers)
+        .where(and(eq(suppliers.storeId, storeId), inArray(suppliers.role, ["warehouse", "local_delivery"])));
+      const hasContact = (r: { tgChatId: string | null; tgGroupId: string | null }) => !!(r.tgGroupId || r.tgChatId);
+
+      // Предзаказы, у которых есть поставщик товара с контактом
+      const preorderIds = mapped.filter((m) => m.statusKey === "preorder").map((m) => m.id);
+      let supplierOk = new Set<string>();
+      if (preorderIds.length > 0) {
+        const r = await db
+          .selectDistinct({ orderId: kaspiOrderEntries.orderId })
+          .from(kaspiOrderEntries)
+          .innerJoin(products, and(eq(products.storeId, storeId), eq(products.code, kaspiOrderEntries.offerCode)))
+          .innerJoin(suppliers, and(eq(suppliers.storeId, storeId), eq(suppliers.name, products.supplier)))
+          .where(and(inArray(kaspiOrderEntries.orderId, preorderIds), or(isNotNull(suppliers.tgGroupId), isNotNull(suppliers.tgChatId))));
+        supplierOk = new Set(r.map((x) => x.orderId));
+      }
+
+      mapped = mapped.map((m) => {
+        let can = false;
+        if (m.statusKey === "preorder") can = supplierOk.has(m.id);
+        else if (m.statusKey === "packing") can = recips.some((r) => r.role === "warehouse" && hasContact(r) && cityMatch(r.city, m.originCity));
+        else if (m.statusKey === "own_delivery") can = recips.some((r) => r.role === "local_delivery" && hasContact(r) && cityMatch(r.city, m.city));
+        return { ...m, canDispatch: can };
+      });
+    } catch {
+      /* ошибка — оставляем canDispatch=false (кнопка не покажется) */
     }
   }
 

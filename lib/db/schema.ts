@@ -456,9 +456,15 @@ export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 
 /**
- * Поставщики — контакты для отправки заказов в Telegram.
- * `name` совпадает с полем «Поставщик» в товарах (products.supplier).
- * Заполняется вручную через модалку. Хранит chat ID (личка) и ID группы.
+ * Поставщики и внутренние получатели заказов — контакты для отправки в Telegram.
+ *
+ * role:
+ *   - `supplier`       — реальный поставщик товара; `name` = products.supplier. Шлём ПРЕДЗАКАЗЫ.
+ *   - `warehouse`      — [Город] Кладовщик: наличие + Kaspi доставка. Упаковывает и везёт на Zammler.
+ *   - `local_delivery` — Своя доставка (газелист): наличие + своя доставка по городу.
+ * city — для внутренних получателей (warehouse/local_delivery), матчится с городом заказа.
+ *
+ * Заполняется через модалку: chat ID (личка) и/или ID группы.
  */
 export const suppliers = pgTable(
   "suppliers",
@@ -467,7 +473,9 @@ export const suppliers = pgTable(
     storeId: uuid("store_id")
       .notNull()
       .references(() => kaspiStores.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),          // = products.supplier
+    name: text("name").notNull(),          // = products.supplier (для role=supplier)
+    role: text("role").notNull().default("supplier"), // supplier | warehouse | local_delivery
+    city: text("city"),                    // для внутренних получателей (Астана)
     tgChatId: text("tg_chat_id"),          // личный chat ID
     tgGroupId: text("tg_group_id"),        // ID группы (отрицательный)
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

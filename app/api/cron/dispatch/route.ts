@@ -25,8 +25,12 @@ import { dispatchOrder, notifyCancellation } from "@/lib/dispatch/send-order";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Статусы, при которых шлём поставщику. Только предзаказ — обычные (в наличии) отгружаем сами.
-const DISPATCHABLE = new Set(["preorder"]);
+// Статусы, при которых отправляем заказ:
+//   preorder      → реальному поставщику (изготовить)
+//   packing       → [Город] Кладовщик (наличие + Kaspi доставка)
+//   own_delivery  → Своя доставка / газелист (наличие + своя доставка)
+// Кому именно — решает dispatchOrder по preOrder + типу доставки.
+const DISPATCHABLE = new Set(["preorder", "packing", "own_delivery"]);
 // Лимиты за один тик cron (бережём лимиты Telegram + время запроса)
 const MAX_DISPATCH_PER_RUN = 5;
 const MAX_CANCEL_PER_RUN = 5;
@@ -95,6 +99,7 @@ export async function POST(req: NextRequest) {
       let candidates: {
         id: string; status: string | null; state: string | null; waybillNumber: string | null;
         assembled: boolean | null; preOrder: string | null; courierTx: string | null;
+        deliveryMode: string | null; isKaspiDelivery: boolean | null;
       }[] = [];
       const cutoff = new Date(now - delayMinutes * 60_000); // возраст ≥ задержки
       if (dispatchFromAt) {
@@ -105,6 +110,8 @@ export async function POST(req: NextRequest) {
             state: kaspiOrders.state,
             waybillNumber: kaspiOrders.waybillNumber,
             assembled: kaspiOrders.assembled,
+            deliveryMode: kaspiOrders.deliveryMode,
+            isKaspiDelivery: kaspiOrders.isKaspiDelivery,
             preOrder: sql<string | null>`${kaspiOrders.rawData}->'attributes'->>'preOrder'`,
             courierTx: sql<string | null>`${kaspiOrders.rawData}->'attributes'->'kaspiDelivery'->>'courierTransmissionDate'`,
           })
@@ -133,6 +140,7 @@ export async function POST(req: NextRequest) {
           status: o.status, state: o.state, waybillNumber: o.waybillNumber,
           preOrder: o.preOrder === "true", assembled: o.assembled ?? false,
           courierTransmitted: !!o.courierTx,
+          deliveryMode: o.deliveryMode, isKaspiDelivery: o.isKaspiDelivery,
         });
         if (!DISPATCHABLE.has(ds.key)) continue;
 

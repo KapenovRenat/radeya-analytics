@@ -50,6 +50,8 @@ export async function GET(
     preOrder: attrs?.preOrder === true,
     assembled: order.assembled ?? false,
     courierTransmitted: !!attrs?.kaspiDelivery?.courierTransmissionDate,
+    deliveryMode: order.deliveryMode,
+    isKaspiDelivery: order.isKaspiDelivery,
   });
 
   return NextResponse.json({

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { HTMLAttributes } from "react";
 
-type Tone = "default" | "emerald" | "red" | "orange" | "amber" | "blue" | "violet" | "kaspi";
+type Tone = "default" | "emerald" | "red" | "orange" | "amber" | "blue" | "violet" | "kaspi" | "brown";
 
 const TONE: Record<Tone, string> = {
   default: "bg-white/[0.06] text-[var(--text-dim)]",
@@ -12,6 +12,7 @@ const TONE: Record<Tone, string> = {
   blue: "bg-[var(--blue-soft)] text-[var(--blue)]",
   violet: "bg-[var(--violet-soft)] text-[var(--violet)]",
   kaspi: "bg-[var(--kaspi)]/12 text-[var(--kaspi)]",
+  brown: "bg-[#4a3424]/40 text-[#c79a6b]",
 };
 
 export function Badge({

@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 2026-06-26
+
+- Спланирована статусная модель заказов (как в Kaspi/МойСкладе) + матрица маршрутизации поставщикам → новая wiki [[orders-statuses]]
+- ✅ Часть 1 (статусы): `lib/kaspi/order-status.ts` — полная модель (13 статусов: +На подписании/Самовывоз/Своя доставка/Ожидают решения по возврату; Завершён→Доставлен и т.д.), функция `deliveryType()`. Тон `brown` в Badge. `orders-list`/`orders/[orderId]` передают `deliveryMode`+`isKaspiDelivery`. Фильтр статусов в таблице обновлён.
+- ✅ Часть 2 (получатели): в `suppliers` колонки `role` (supplier/warehouse/local_delivery) + `city`. `lib/dispatch/internal-recipients.ts` — два внутренних: [Астана] Кладовщик, [Астана] Своя доставка (авто-засев в suppliers GET). Модалка показывает их с бейджем. **Нужна миграция** `npm run db:migrate`.
+- ✅ Часть 3 (маршрутизация): `dispatchOrder` ветвится — предзаказ→поставщик товара; наличие+Kaspi→Кладовщик; наличие+своя→газелист (по `role`+`city`). `DISPATCHABLE = {preorder, packing, own_delivery}` в cron и кнопке. Превью (`dispatch-preview`) показывает реальный маршрут + получателя.
+- ✅ Часть 4 (карточка газелиста): `render-card.tsx` — `variant: "delivery"` показывает адрес+телефон клиента (`deliveryAddressFormatted`, `customerCellPhone`) + дату доставки вместо Zammler/даты сдачи. `send-order.ts` передаёт вариант для `local_delivery`.
+- ✅ Кнопка «Отправить» в таблице — показывается только если есть получатель с Telegram-контактом под маршрут заказа (`canDispatch` в `orders-list`: предзаказ→поставщик с контактом; Упаковка→Кладовщик; Своя доставка→газелист). Лейбл «Поставщику» → «Отправить».
+- ✅ Цвет фона карточки по типу: предзаказ → тёмно-красный, наличие → тёмно-зелёный (`render-card.tsx`, флаг `isPreorder` из `send-order.ts`).
+
 ## 2026-06-24
 
 - Отправка поставщику теперь **только для предзаказов** (`DISPATCHABLE = {"preorder"}`) — и в cron (`app/api/cron/dispatch/route.ts`), и в кнопке таблицы (`orders-table.tsx`). Обычные «в наличии» отгружаем сами. Предзаказ/обычный определяется по `raw_data.attributes.preOrder`.
