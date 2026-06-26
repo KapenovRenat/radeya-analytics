@@ -128,18 +128,26 @@ export interface CancelCardData {
   imageUrl: string;
   orderNo: string;
   orderCode: string;
-  type: "in_transit" | "by_customer"; // отмена в пути / отмена клиентом
+  type: "in_transit" | "by_customer" | "returned"; // отмена в пути / отмена клиентом / возврат
   originCity: string;
   displayName: string;
   code: string | null;
+  isDelivery?: boolean; // получатель — газелист (своя доставка): другой текст действия
 }
 
 export async function renderCancelCard(data: CancelCardData): Promise<Uint8Array> {
   const { regular, bold, black } = await loadFonts();
-  const typeLabel = data.type === "in_transit" ? "Отмена в пути" : "Отмена клиентом";
-  const action = data.type === "in_transit"
-    ? `Забрать с Zammler в г. ${data.originCity}`
-    : "Складировать";
+  const isReturn = data.type === "returned";
+  const typeLabel =
+    data.type === "returned" ? "Возврат"
+    : data.type === "in_transit" ? "Отмена в пути"
+    : "Отмена клиентом";
+  const action =
+    data.type === "returned" ? "Принять возврат"
+    : data.type === "in_transit"
+      ? (data.isDelivery ? "Вернуть на склад" : `Забрать с Zammler в г. ${data.originCity}`)
+      : "Складировать";
+  const bannerText = isReturn ? "↩️ ВОЗВРАТ ЗАКАЗА" : "❌ ОТМЕНА ЗАКАЗА";
 
   const line = (children: React.ReactNode, style: React.CSSProperties = {}) => (
     <div style={{ display: "flex", color: "#E7EAF0", fontSize: 22, lineHeight: 1.35, ...style }}>{children}</div>
@@ -152,7 +160,7 @@ export async function renderCancelCard(data: CancelCardData): Promise<Uint8Array
         <img src={data.imageUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         {/* красная плашка ОТМЕНА */}
         <div style={{ display: "flex", position: "absolute", top: 0, left: 0, right: 0, background: "#B3261E", padding: "10px 0", justifyContent: "center" }}>
-          <div style={{ display: "flex", color: "#FFFFFF", fontSize: 30, fontWeight: 700 }}>❌ ОТМЕНА ЗАКАЗА</div>
+          <div style={{ display: "flex", color: "#FFFFFF", fontSize: 30, fontWeight: 700 }}>{bannerText}</div>
         </div>
       </div>
 

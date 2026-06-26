@@ -283,20 +283,28 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
 export async function notifyCancellation(
   storeId: string,
   orderId: string,
-  type: "in_transit" | "by_customer",
+  type: "in_transit" | "by_customer" | "returned",
 ): Promise<{ ok: boolean; notified: string[]; error?: string }> {
   const db = getDb();
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
   if (!botToken) return { ok: false, notified: [], error: "TELEGRAM_BOT_TOKEN не задан" };
 
   const [order] = await db
-    .select({ orderCode: kaspiOrders.orderCode, originCity: kaspiOrders.originAddressCity })
+    .select({
+      orderCode: kaspiOrders.orderCode,
+      state: kaspiOrders.state,
+      deliveryMode: kaspiOrders.deliveryMode,
+      isKaspiDelivery: kaspiOrders.isKaspiDelivery,
+      originCity: kaspiOrders.originAddressCity,
+      deliveryCity: kaspiOrders.deliveryAddressCity,
+      rawData: kaspiOrders.rawData,
+    })
     .from(kaspiOrders)
     .where(and(eq(kaspiOrders.id, orderId), eq(kaspiOrders.storeId, storeId)))
     .limit(1);
   if (!order) return { ok: false, notified: [], error: "Заказ не найден" };
 
-  // Поставщики, кому отправляли заказ и кого ещё не уведомляли об отмене
+  // Получатели, кому отправляли заказ и кого ещё не уведомляли об отмене
   const targets = await db
     .select({ supplierName: orderDispatches.supplierName, cancelNotifiedAt: orderDispatches.cancelNotifiedAt })
     .from(orderDispatches)
@@ -306,6 +314,23 @@ export async function notifyCancellation(
 
   const orderNo = order.orderCode.slice(-4);
   const originCity = order.originCity ?? "—";
+
+  // Маршрут — как в dispatchOrder: предзаказ→поставщик, наличие→внутренний получатель
+  const preOrder = (order.rawData as { attributes?: { preOrder?: boolean } } | null)?.attributes?.preOrder === true;
+  const dtype = deliveryType({ state: order.state, deliveryMode: order.deliveryMode, isKaspiDelivery: order.isKaspiDelivery });
+  const mode: "supplier" | "warehouse" | "local_delivery" | null =
+    preOrder ? "supplier" : dtype === "kaspi" ? "warehouse" : dtype === "own" ? "local_delivery" : null;
+
+  // Имя внутреннего получателя (для наличия) — по роли + городу
+  let internalName: string | null = null;
+  if (mode === "warehouse" || mode === "local_delivery") {
+    const matchCity = mode === "warehouse" ? order.originCity : order.deliveryCity;
+    const recips = await db
+      .select({ name: suppliers.name, city: suppliers.city })
+      .from(suppliers)
+      .where(and(eq(suppliers.storeId, storeId), eq(suppliers.role, mode)));
+    internalName = recips.find((r) => cityMatch(r.city, matchCity))?.name ?? null;
+  }
 
   // Контакты + позиции
   const supplierRows = await db
@@ -319,7 +344,7 @@ export async function notifyCancellation(
     .from(kaspiOrderEntries)
     .where(eq(kaspiOrderEntries.orderId, orderId));
 
-  // позиции по поставщику (для уведомляемых)
+  // позиции по получателю (только те, кому уже слали этот заказ)
   const bySupplier = new Map<string, { chatId: string; displayName: string; code: string | null; imageUrl: string }[]>();
   for (const e of entries) {
     if (!e.offerCode) continue;
@@ -328,15 +353,20 @@ export async function notifyCancellation(
       .from(products)
       .where(and(eq(products.storeId, storeId), eq(products.code, e.offerCode)))
       .limit(1);
-    if (!prod?.supplier || !toNotify.includes(prod.supplier)) continue;
-    const sup = supplierMap.get(prod.supplier);
+    if (!prod) continue;
+
+    // Получатель этой позиции — как при отправке заказа
+    const recipientName = mode === "supplier" ? prod.supplier : internalName;
+    if (!recipientName || !toNotify.includes(recipientName)) continue;
+
+    const sup = supplierMap.get(recipientName);
     const chatId = sup?.tgGroupId || sup?.tgChatId;
     if (!chatId) continue;
     const imageUrl = prod.imageUrl || DEFAULT_IMAGE;
     if (!imageUrl) continue;
     const parsed = parseProductName(prod.name);
-    if (!bySupplier.has(prod.supplier)) bySupplier.set(prod.supplier, []);
-    bySupplier.get(prod.supplier)!.push({ chatId, displayName: parsed.displayName, code: prod.code, imageUrl });
+    if (!bySupplier.has(recipientName)) bySupplier.set(recipientName, []);
+    bySupplier.get(recipientName)!.push({ chatId, displayName: parsed.displayName, code: prod.code, imageUrl });
   }
 
   const notified: string[] = [];
@@ -347,6 +377,7 @@ export async function notifyCancellation(
         const png = await renderCancelCard({
           imageUrl: it.imageUrl, orderNo, orderCode: order.orderCode, type, originCity,
           displayName: it.displayName, code: it.code,
+          isDelivery: mode === "local_delivery",
         });
         const r = await sendTelegramPhotoBuffer(botToken, it.chatId, png);
         if (r.ok) okCount++;

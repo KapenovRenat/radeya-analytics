@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
         .where(and(
           eq(orderDispatches.storeId, storeId),
           isNull(orderDispatches.cancelNotifiedAt),
-          inArray(kaspiOrders.status, ["CANCELLED", "CANCELLING"]),
+          inArray(kaspiOrders.status, ["CANCELLED", "CANCELLING", "RETURNED"]),
         ));
       const seenCancel = new Set<string>();
       let cancelNotified = 0;
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
         if (cancelNotified >= MAX_CANCEL_PER_RUN) break;
         if (seenCancel.has(c.orderId)) continue;
         seenCancel.add(c.orderId);
-        const type = c.status === "CANCELLING" ? "in_transit" : "by_customer";
+        const type = c.status === "CANCELLING" ? "in_transit" : c.status === "RETURNED" ? "returned" : "by_customer";
         const r = await notifyCancellation(storeId, c.orderId, type);
         if (r.notified.length > 0) cancelNotified++;
       }
