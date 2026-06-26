@@ -83,8 +83,15 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
     .limit(1);
   if (!order) return { ok: false, orderCode: "", sentSuppliers: [], skipped: [], alreadyDispatched: [], error: "Заказ не найден" };
 
-  const attrs = (order.rawData as { attributes?: { plannedDeliveryDate?: number | null; preOrder?: boolean } } | null)?.attributes;
+  const attrs = (order.rawData as {
+    attributes?: {
+      plannedDeliveryDate?: number | null;
+      preOrder?: boolean;
+      kaspiDelivery?: { courierTransmissionPlanningDate?: number | null };
+    };
+  } | null)?.attributes;
   const plannedDeliveryMs = attrs?.plannedDeliveryDate ?? null; // планируемая дата доставки заказа
+  const courierPlanMs = attrs?.kaspiDelivery?.courierTransmissionPlanningDate ?? null; // план передачи курьеру
   const orderNo = order.orderCode.slice(-4);
   const originCity = order.originCity ?? "—";
   const preOrder = attrs?.preOrder === true;
@@ -116,31 +123,14 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
     internalRecipient = { name: rec.name, chatId, isGroup: !!rec.tgGroupId };
   }
 
-  // Дни склада по городу отгрузки заказа
-  const whDaysForCity = (prod: {
-    whAstana: number | null; whPavlodar: number | null; whKostanay: number | null;
-    whPetropavlovsk: number | null; whAlmaty: number | null;
-  }): number => {
-    const c = originCity.toLowerCase();
-    if (c.includes("астан")) return prod.whAstana ?? 0;
-    if (c.includes("павлодар")) return prod.whPavlodar ?? 0;
-    if (c.includes("костанай")) return prod.whKostanay ?? 0;
-    if (c.includes("петропавл")) return prod.whPetropavlovsk ?? 0;
-    if (c.includes("алмат")) return prod.whAlmaty ?? 0;
-    return 0;
-  };
+  const fmtDate = (ms: number) =>
+    new Date(ms).toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Asia/Almaty" });
 
-  // Дата сдачи = плановая дата доставки заказа − дни склада (по городу отгрузки)
-  const calcHandoff = (whDays: number): string => {
-    if (!plannedDeliveryMs) return "уточняется";
-    const ms = plannedDeliveryMs - whDays * 86_400_000;
-    return new Date(ms).toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Asia/Almaty" });
-  };
+  // Дата сдачи = планируемая передача курьеру − 2 дня (courierTransmissionPlanningDate)
+  const handoffStr = courierPlanMs ? fmtDate(courierPlanMs - 2 * 86_400_000) : "уточняется";
 
   // Дата доставки клиенту (для газелиста) = плановая дата доставки заказа
-  const deliveryDateStr = plannedDeliveryMs
-    ? new Date(plannedDeliveryMs).toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Asia/Almaty" })
-    : "—";
+  const deliveryDateStr = plannedDeliveryMs ? fmtDate(plannedDeliveryMs) : "—";
 
   const [settings] = await db.select().from(dispatchSettings).where(eq(dispatchSettings.storeId, storeId)).limit(1);
   const dopText = settings?.dopText?.trim() || DEFAULT_DOP;
@@ -163,11 +153,7 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
   for (const e of entries) {
     if (!e.offerCode) { skipped.push({ reason: "Нет артикула", detail: "" }); continue; }
     const [prod] = await db
-      .select({
-        name: products.name, code: products.code, supplier: products.supplier, imageUrl: products.imageUrl,
-        whAstana: products.whAstana, whPavlodar: products.whPavlodar, whKostanay: products.whKostanay,
-        whPetropavlovsk: products.whPetropavlovsk, whAlmaty: products.whAlmaty,
-      })
+      .select({ name: products.name, code: products.code, supplier: products.supplier, imageUrl: products.imageUrl })
       .from(products)
       .where(and(eq(products.storeId, storeId), eq(products.code, e.offerCode)))
       .limit(1);
@@ -199,7 +185,7 @@ export async function dispatchOrder(storeId: string, orderId: string): Promise<D
       fabric: parsed.fabric,
       code: prod.code,
       imageUrl,
-      handoffDate: calcHandoff(whDaysForCity(prod)),
+      handoffDate: handoffStr,
     });
   }
 

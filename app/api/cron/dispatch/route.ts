@@ -35,6 +35,18 @@ const DISPATCHABLE = new Set(["preorder", "packing", "own_delivery"]);
 const MAX_DISPATCH_PER_RUN = 5;
 const MAX_CANCEL_PER_RUN = 5;
 
+// Рабочее окно отправки: пн–сб 08:00–17:00 по Алматы.
+// Вне окна (вечер/ночь, воскресенье) — синк идёт, но в Telegram ничего не шлём;
+// заказы остаются кандидатами и уйдут в начале следующего рабочего окна.
+const SEND_START_HOUR = 8;
+const SEND_END_HOUR = 17; // не включительно
+function withinSendWindow(now = new Date()): boolean {
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Almaty", weekday: "short" }).format(now);
+  if (weekday === "Sun") return false; // воскресенье — выходной
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Almaty", hour: "2-digit", hourCycle: "h23" }).format(now));
+  return hour >= SEND_START_HOUR && hour < SEND_END_HOUR;
+}
+
 async function runOrdersSync(storeId: string) {
   const to = new Date();
   const from = new Date(to.getTime() - 14 * 86_400_000);
@@ -62,6 +74,9 @@ export async function POST(req: NextRequest) {
 
   const db = getDb();
   const stores = await db.select({ id: kaspiStores.id }).from(kaspiStores);
+
+  // Рабочее окно: вне него синкаем, но в Telegram не шлём (заказы ждут утра)
+  const canSend = withinSendWindow();
 
   const report: Record<string, unknown>[] = [];
 
@@ -133,45 +148,49 @@ export async function POST(req: NextRequest) {
       let sent = 0;
       let skippedNoSupplier = 0;
       let dispatchedThisRun = 0;
-      for (const o of candidates) {
-        if (dispatchedThisRun >= MAX_DISPATCH_PER_RUN) break; // лимит за тик
-        if (dispatchedSet.has(o.id)) continue;
-        const ds = mapOrderStatus({
-          status: o.status, state: o.state, waybillNumber: o.waybillNumber,
-          preOrder: o.preOrder === "true", assembled: o.assembled ?? false,
-          courierTransmitted: !!o.courierTx,
-          deliveryMode: o.deliveryMode, isKaspiDelivery: o.isKaspiDelivery,
-        });
-        if (!DISPATCHABLE.has(ds.key)) continue;
-
-        const result = await dispatchOrder(storeId, o.id);
-        dispatchedThisRun++;
-        if (result.sentSuppliers.length > 0) sent += result.sentSuppliers.length;
-        else skippedNoSupplier++; // нет поставщика/контакта/картинки — просто пропускаем
-      }
-
-      // 5. Уведомления об отменах: отправляли заказ, теперь отменён, ещё не уведомляли
-      const cancels = await db
-        .select({ orderId: orderDispatches.orderId, status: kaspiOrders.status })
-        .from(orderDispatches)
-        .innerJoin(kaspiOrders, eq(orderDispatches.orderId, kaspiOrders.id))
-        .where(and(
-          eq(orderDispatches.storeId, storeId),
-          isNull(orderDispatches.cancelNotifiedAt),
-          inArray(kaspiOrders.status, ["CANCELLED", "CANCELLING", "RETURNED"]),
-        ));
-      const seenCancel = new Set<string>();
       let cancelNotified = 0;
-      for (const c of cancels) {
-        if (cancelNotified >= MAX_CANCEL_PER_RUN) break;
-        if (seenCancel.has(c.orderId)) continue;
-        seenCancel.add(c.orderId);
-        const type = c.status === "CANCELLING" ? "in_transit" : c.status === "RETURNED" ? "returned" : "by_customer";
-        const r = await notifyCancellation(storeId, c.orderId, type);
-        if (r.notified.length > 0) cancelNotified++;
+
+      // Отправка + уведомления об отменах — только в рабочее окно (08:00–17:00, не вс)
+      if (canSend) {
+        for (const o of candidates) {
+          if (dispatchedThisRun >= MAX_DISPATCH_PER_RUN) break; // лимит за тик
+          if (dispatchedSet.has(o.id)) continue;
+          const ds = mapOrderStatus({
+            status: o.status, state: o.state, waybillNumber: o.waybillNumber,
+            preOrder: o.preOrder === "true", assembled: o.assembled ?? false,
+            courierTransmitted: !!o.courierTx,
+            deliveryMode: o.deliveryMode, isKaspiDelivery: o.isKaspiDelivery,
+          });
+          if (!DISPATCHABLE.has(ds.key)) continue;
+
+          const result = await dispatchOrder(storeId, o.id);
+          dispatchedThisRun++;
+          if (result.sentSuppliers.length > 0) sent += result.sentSuppliers.length;
+          else skippedNoSupplier++; // нет поставщика/контакта/картинки — просто пропускаем
+        }
+
+        // 5. Уведомления об отменах: отправляли заказ, теперь отменён, ещё не уведомляли
+        const cancels = await db
+          .select({ orderId: orderDispatches.orderId, status: kaspiOrders.status })
+          .from(orderDispatches)
+          .innerJoin(kaspiOrders, eq(orderDispatches.orderId, kaspiOrders.id))
+          .where(and(
+            eq(orderDispatches.storeId, storeId),
+            isNull(orderDispatches.cancelNotifiedAt),
+            inArray(kaspiOrders.status, ["CANCELLED", "CANCELLING", "RETURNED"]),
+          ));
+        const seenCancel = new Set<string>();
+        for (const c of cancels) {
+          if (cancelNotified >= MAX_CANCEL_PER_RUN) break;
+          if (seenCancel.has(c.orderId)) continue;
+          seenCancel.add(c.orderId);
+          const type = c.status === "CANCELLING" ? "in_transit" : c.status === "RETURNED" ? "returned" : "by_customer";
+          const r = await notifyCancellation(storeId, c.orderId, type);
+          if (r.notified.length > 0) cancelNotified++;
+        }
       }
 
-      report.push({ storeId, sent, skippedNoSupplier, cancelNotified, candidates: candidates.length, dispatchFromAt: dispatchFromAt?.toISOString() ?? null });
+      report.push({ storeId, canSend, sent, skippedNoSupplier, cancelNotified, candidates: candidates.length, dispatchFromAt: dispatchFromAt?.toISOString() ?? null });
     } catch (err) {
       report.push({ storeId, error: err instanceof Error ? err.message : String(err) });
     }
