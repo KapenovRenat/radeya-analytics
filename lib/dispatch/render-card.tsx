@@ -86,17 +86,17 @@ export async function renderOrderCard(data: CardData): Promise<Uint8Array> {
         {line("🚨 Каспи магазин 🚨", { fontWeight: 700, color: "#FF5A5A" })}
 
         {data.variant === "delivery" ? (
-          <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {line("🚚 Доставка по городу", { color: "#C7CCD6", fontSize: 22, fontWeight: 800 })}
             {line(`Адрес: ${data.customerAddress ?? "—"}`, { color: "#FFFFFF", fontWeight: 700 })}
             {line(`Тел: ${data.customerPhone ?? "—"}`, { color: "#C7CCD6" })}
             {data.deliveryDate ? line(`Дата доставки: ${data.deliveryDate} ✅`, { fontWeight: 700, color: "#FFFFFF" }) : null}
-          </>
+          </div>
         ) : (
-          <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {line(`Отгрузка на Zammler в г. ${data.originCity}`, { color: "#C7CCD6", fontSize: 32, fontWeight: 900 })}
             {line(`Дата сдачи: ${data.handoffDate} ✅`, { fontWeight: 700, color: "#FFFFFF" })}
-          </>
+          </div>
         )}
 
         <div style={{ display: "flex", height: 12 }} />
