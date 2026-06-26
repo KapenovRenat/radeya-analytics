@@ -95,7 +95,7 @@ export async function renderOrderCard(data: CardData): Promise<Uint8Array> {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {line(`Отгрузка на Zammler в г. ${data.originCity}`, { color: "#C7CCD6", fontSize: 32, fontWeight: 900 })}
-            {line(`Дата сдачи: ${data.handoffDate} ✅`, { fontWeight: 700, color: "#FFFFFF" })}
+            {line(`Дата сдачи: ${data.handoffDate} ✅`, { fontWeight: 900, fontSize: 32, color: "#FFFFFF" })}
           </div>
         )}
 
